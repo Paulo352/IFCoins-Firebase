@@ -61,18 +61,43 @@ export default function LoginPage() {
       });
     }
   };
+  
+  const testUsers = [
+    {
+      role: 'Admin',
+      email: 'paulocauan39@gmail.com',
+    },
+    {
+      role: 'Professor',
+      email: 'professor@ifpr.edu.br',
+    },
+    {
+      role: 'Aluno',
+      email: 'aluno@estudantes.ifpr.edu.br',
+    },
+  ];
 
   return (
-    <div className="w-full lg:grid lg:min-h-[600px] lg:grid-cols-2 xl:min-h-[800px]">
-       <div className="hidden bg-muted lg:block">
-        <Image
-          src="https://picsum.photos/seed/login/1280/800"
-          alt="Image"
-          width="1280"
-          height="800"
-          data-ai-hint="school students"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-        />
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+      <div className="hidden bg-muted lg:flex lg:flex-col lg:items-center lg:justify-center p-12">
+        <div className="w-full max-w-md">
+           <h2 className="text-3xl font-bold mb-4">Contas de Teste</h2>
+            <p className="text-muted-foreground mb-8">
+                Use as contas abaixo para explorar os diferentes perfis. A senha para todas é <code className="font-bold bg-secondary text-secondary-foreground px-2 py-1 rounded-md">123456</code>.
+            </p>
+            <div className="space-y-4">
+                {testUsers.map((user) => (
+                    <Card key={user.role}>
+                        <CardHeader>
+                            <CardTitle className="text-xl">{user.role}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm font-mono">{user.email}</p>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        </div>
       </div>
       <div className="flex items-center justify-center py-12">
           <Card className="mx-auto w-full max-w-sm border-none shadow-none lg:border lg:shadow-sm">
