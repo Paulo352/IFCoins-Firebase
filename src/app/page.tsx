@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IFCoinIcon } from '@/components/icons';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useUser } from '@/firebase';
 import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
@@ -21,32 +21,30 @@ import {
   UserCredential,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { useFirestore } from '@/firebase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const auth = useAuth();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isUserLoading, router]);
+
+
   const handleSuccessfulLogin = async (userCredential: UserCredential) => {
     const user = userCredential.user;
     
-    // This will now be handled by the AppLayout to ensure claims are fresh
-    // on every app load after login. We just need to ensure the user document exists.
-    const userDocRef = doc(firestore, "users", user.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (!userDoc.exists()) {
-       // The AppLayout will create the user doc on the next screen if it doesn't exist.
-       // This logic is now centralized. We just log them in.
-    }
-    
-    // We still force a token refresh on login to be safe.
     await user.getIdToken(true);
 
     toast({ title: 'Login bem-sucedido!' });
@@ -73,14 +71,19 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      'login_hint': 'user@example.com',
+       hd: 'ifpr.edu.br' // Uncomment if you want to restrict to a certain domain
+    });
+
     try {
       const userCredential = await signInWithPopup(auth, provider);
       await handleSuccessfulLogin(userCredential);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro no login com Google',
-        description: 'Não foi possível fazer login com o Google.',
+        description: 'Não foi possível fazer login com o Google. Verifique se você está usando uma conta permitida.',
       });
     }
   };
@@ -191,8 +194,8 @@ export default function LoginPage() {
               </div>
               <div className="mt-4 text-center text-sm">
                 Não tem uma conta?{' '}
-                <Link href="#" className="underline">
-                  Contate um administrador
+                <Link href="/cadastro" className="underline">
+                  Crie sua conta
                 </Link>
               </div>
             </CardContent>
