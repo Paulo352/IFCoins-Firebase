@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -49,7 +49,7 @@ const studentNav = [
 const teacherNav = [
   { href: '/dashboard', label: 'Painel', icon: Home },
   { href: '/recompensar', label: 'Recompensar', icon: PlusCircle },
-  { href: '/admin/alunos', label: 'Gerenciar Alunos', icon: Users },
+  { href: '/admin/alunos', label: 'Gerenciar Pessoas', icon: Users },
   { href: '/admin/cartas', label: 'Gerenciar Cartas', icon: Book },
   { href: '/eventos', label: 'Eventos', icon: Calendar },
   { href: '/classificacoes', label: 'Classificações', icon: Medal },
@@ -58,7 +58,7 @@ const teacherNav = [
 const adminNav = [
   { href: '/dashboard', label: 'Painel', icon: Home },
   { href: '/recompensar', label: 'Recompensar', icon: PlusCircle },
-  { href: '/admin/alunos', label: 'Alunos', icon: Users },
+  { href: '/admin/alunos', label: 'Pessoas', icon: Users },
   { href: '/admin/cartas', label: 'Cartas', icon: Book },
   { href: '/admin/eventos', label: 'Eventos', icon: Calendar },
   { href: '/classificacoes', label: 'Classificações', icon: Medal },
