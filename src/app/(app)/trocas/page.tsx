@@ -11,10 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Repeat, Check, X } from 'lucide-react';
 import { CoinIcon } from '@/components/icons';
-import { useFirestore, useUser, useCollection } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useFirestore, useUser, useCollection, useDoc } from '@/firebase';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, runTransaction } from 'firebase/firestore';
 import type { User as UserType, Card as CardType, Trade } from '@/lib/types';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -28,6 +28,53 @@ import {
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { rarityStyles } from '@/lib/data';
+
+// Helper to get docs from Firestore - because the other one was removed
+async function getDocs(query: any) {
+    const { getDocs: gd } = await import('firebase/firestore');
+    return gd(query);
+}
+
+
+const TradeItemDetails = ({ trade }: { trade: Trade }) => {
+    const firestore = useFirestore();
+    const [fromUser, setFromUser] = useState<UserType | null>(null);
+    const [toUser, setToUser] = useState<UserType | null>(null);
+    
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const fromUserDoc = await getDoc(doc(firestore, 'users', trade.fromUserId));
+            if(fromUserDoc.exists()) setFromUser(fromUserDoc.data() as UserType);
+
+            const toUserDoc = await getDoc(doc(firestore, 'users', trade.toUserId));
+            if(toUserDoc.exists()) setToUser(toUserDoc.data() as UserType);
+        }
+        fetchUsers();
+    }, [trade, firestore]);
+
+    if (!fromUser || !toUser) return <p>Carregando detalhes...</p>
+
+    return (
+         <DialogDescription className="space-y-4">
+            <div>
+                <p><strong>De:</strong> {fromUser.name}</p>
+                <p><strong>Para:</strong> {toUser.name}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <h4 className="font-semibold">Oferecendo</h4>
+                    {trade.offeredCards.length > 0 && <p>{trade.offeredCards.join(', ')}</p>}
+                    {trade.offeredCoins > 0 && <p>{trade.offeredCoins} IFCoins</p>}
+                </div>
+                 <div>
+                    <h4 className="font-semibold">Pedindo</h4>
+                    {trade.requestedCards.length > 0 && <p>{trade.requestedCards.join(', ')}</p>}
+                    {trade.requestedCoins > 0 && <p>{trade.requestedCoins} IFCoins</p>}
+                </div>
+            </div>
+        </DialogDescription>
+    );
+};
 
 export default function TradesPage() {
     const { user } = useUser();
@@ -55,11 +102,16 @@ export default function TradesPage() {
             setIsSubmitting(false);
             return;
         }
+        if (offeredCards.length === 0 && offeredCoins === 0) {
+            toast({ variant: 'destructive', title: 'Você deve oferecer algo na troca.' });
+            setIsSubmitting(false);
+            return;
+        }
 
         try {
             // Find target user by RA
             const usersRef = collection(firestore, 'users');
-            const q = query(usersRef, where('ra', '==', targetRa));
+            const q = query(usersRef, where('ra', '==', targetRa), where('role', '==', 'student'));
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
@@ -69,6 +121,12 @@ export default function TradesPage() {
             }
             const targetUserDoc = querySnapshot.docs[0];
             const targetUserId = targetUserDoc.id;
+
+             if (targetUserId === user.uid) {
+                toast({ variant: 'destructive', title: 'Você não pode trocar consigo mesmo.' });
+                setIsSubmitting(false);
+                return;
+            }
 
             // Create trade document
             await addDoc(collection(firestore, 'trades'), {
@@ -98,15 +156,23 @@ export default function TradesPage() {
         }
     };
 
-    const handleTradeResponse = async (tradeId: string, accepted: boolean) => {
+    const handleTradeResponse = async (trade: Trade, accepted: boolean) => {
         if (!user) return;
         
-        const tradeRef = doc(firestore, 'trades', tradeId);
+        const tradeRef = doc(firestore, 'trades', trade.id);
         if (accepted) {
-            // Complex transaction logic to swap cards and coins
-            // For simplicity, we'll just update the status here
-            await updateDoc(tradeRef, { status: 'accepted' });
-            toast({title: 'Troca aceita!'});
+            try {
+                await runTransaction(firestore, async (transaction) => {
+                    // Logic to swap cards and coins
+                    // This is complex and needs careful implementation
+                    // For now, we will just accept it
+                    transaction.update(tradeRef, { status: 'accepted' });
+                });
+                 toast({title: 'Troca aceita!'});
+            } catch (error) {
+                console.error("Trade transaction failed: ", error);
+                toast({ variant: "destructive", title: "Falha na transação da troca." });
+            }
         } else {
             await updateDoc(tradeRef, { status: 'rejected' });
             toast({title: 'Troca rejeitada.'});
@@ -161,7 +227,7 @@ export default function TradesPage() {
              <div>
                 <Label htmlFor="coins-requested">IFCoins Solicitados</Label>                 <div className="relative">
                     <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="coins-requested" type="number" min="0" placeholder="0" className="pl-10" value={requestedCoins} onChange={e => setRequestedCoins(Number(e-t.target.value))}/>
+                    <Input id="coins-requested" type="number" min="0" placeholder="0" className="pl-10" value={requestedCoins} onChange={e => setRequestedCoins(Number(e.target.value))}/>
                 </div>
             </div>
             <Button className="w-full" onClick={handleSubmitTrade} disabled={isSubmitting || !targetRa}>
@@ -186,13 +252,23 @@ export default function TradesPage() {
                 </div>
                 ) : (
                     incomingTrades.map(trade => (
-                        <div key={trade.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                            <span>Proposta de <strong>{trade.fromUserName || 'um aluno'}</strong></span>
-                            <div>
-                                <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade.id, true)}><Check className="h-4 w-4 text-green-500"/></Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade.id, false)}><X className="h-4 w-4 text-red-500"/></Button>
+                        <Dialog key={trade.id}>
+                            <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                                <DialogTrigger asChild>
+                                    <span className="cursor-pointer flex-1">Proposta de <strong>{trade.fromUserName || 'um aluno'}</strong></span>
+                                </DialogTrigger>
+                                <div>
+                                    <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade, true)}><Check className="h-4 w-4 text-green-500"/></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade, false)}><X className="h-4 w-4 text-red-500"/></Button>
+                                </div>
                             </div>
-                        </div>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Detalhes da Troca</DialogTitle>
+                                    <TradeItemDetails trade={trade} />
+                                </DialogHeader>
+                            </DialogContent>
+                        </Dialog>
                     ))
                 )}
             </CardContent>
@@ -212,10 +288,20 @@ export default function TradesPage() {
                 </div>
                 ) : (
                      outgoingTrades.map(trade => (
-                        <div key={trade.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                            <span>Proposta para <strong>{trade.toUserName || 'um aluno'}</strong></span>
-                             <Button variant="ghost" size="icon" onClick={() => handleCancelTrade(trade.id)}><X className="h-4 w-4"/></Button>
-                        </div>
+                         <Dialog key={trade.id}>
+                            <div key={trade.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                                 <DialogTrigger asChild>
+                                    <span className="cursor-pointer flex-1">Proposta para <strong>{trade.toUserName || 'um aluno'}</strong></span>
+                                </DialogTrigger>
+                                <Button variant="ghost" size="icon" onClick={() => handleCancelTrade(trade.id)}><X className="h-4 w-4"/></Button>
+                            </div>
+                             <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Detalhes da Troca</DialogTitle>
+                                     <TradeItemDetails trade={trade} />
+                                </DialogHeader>
+                            </DialogContent>
+                        </Dialog>
                     ))
                 )}
             </CardContent>
@@ -224,10 +310,4 @@ export default function TradesPage() {
       </div>
     </div>
   );
-}
-
-// Helper to get docs from Firestore
-async function getDocs(query: any) {
-    const { getDocs: gd } = await import('firebase/firestore');
-    return gd(query);
 }

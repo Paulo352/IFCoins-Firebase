@@ -33,8 +33,8 @@ import type { User, UserRole } from '@/lib/types';
 import { users } from '@/lib/data';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
-import { useUser, useFirestore } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const studentNav = [
@@ -57,6 +57,7 @@ const teacherNav = [
 
 const adminNav = [
   { href: '/dashboard', label: 'Painel', icon: Home },
+  { href: '/recompensar', label: 'Recompensar', icon: PlusCircle },
   { href: '/admin/alunos', label: 'Alunos', icon: Users },
   { href: '/admin/cartas', label: 'Cartas', icon: Book },
   { href: '/admin/eventos', label: 'Eventos', icon: Calendar },
@@ -76,26 +77,22 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const [appUser, setAppUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole>('student');
   
+  const userDocRef = useMemo(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userData } = useDoc<User>(userDocRef);
+  
   useEffect(() => {
-    if (user) {
-      const fetchUserData = async () => {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
-          setAppUser(userData);
-          setRole(userData.role);
-        } else {
-          // Handle case where user exists in Auth but not in Firestore
-          // This could be a new user, so you might want to create a document.
-          // For now, we'll use a default student profile.
-          const defaultUser = users.find(u => u.role === 'student')!;
-          setAppUser({ ...defaultUser, id: user.uid, email: user.email!, name: user.displayName || 'Novo Aluno' });
-        }
-      };
-      fetchUserData();
+    if (userData) {
+      setAppUser(userData);
+      setRole(userData.role);
+    } else if (user && !isUserLoading) {
+        const defaultUser = users.find(u => u.role === 'student')!;
+        setAppUser({ ...defaultUser, id: user.uid, email: user.email!, name: user.displayName || 'Novo Aluno' });
     }
-  }, [user, firestore]);
+  }, [user, userData, isUserLoading]);
 
   const router = useRouter();
   useEffect(() => {
