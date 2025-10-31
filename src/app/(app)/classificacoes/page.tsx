@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import type { User, User as UserType } from '@/lib/types';
 import { useMemo, useEffect, useState } from 'react';
@@ -28,20 +28,21 @@ export default function RankingsPage() {
   const [topCollectors, setTopCollectors] = useState<UserWithCollectionSize[]>([]);
   const [collectorsLoading, setCollectorsLoading] = useState(true);
 
-  const richestQuery = useMemo(
+  const richestQuery = useMemoFirebase(
     () =>
-      query(
+      firestore ? query(
         collection(firestore, 'users'),
         where('role', '==', 'student'),
         orderBy('coins', 'desc'),
         limit(10)
-      ),
+      ) : null,
     [firestore]
   );
   const { data: richestStudents, isLoading: richestLoading } =
     useCollection<User>(richestQuery);
 
   useEffect(() => {
+    if (!firestore) return;
     const fetchCollectors = async () => {
       setCollectorsLoading(true);
       const studentsQuery = query(collection(firestore, 'users'), where('role', '==', 'student'));

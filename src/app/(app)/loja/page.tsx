@@ -13,7 +13,7 @@ import type { Pack, Card as CardType, Rarity, User } from '@/lib/types';
 import Image from 'next/image';
 import { CoinIcon } from '@/components/icons';
 import { ShoppingBag } from 'lucide-react';
-import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch, runTransaction, getDoc, setDoc } from 'firebase/firestore';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,12 +51,12 @@ export default function ShopPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const packsQuery = useMemo(() => collection(firestore, 'packs'), [firestore]);
+  const packsQuery = useMemoFirebase(() => collection(firestore, 'packs'), [firestore]);
   const { data: packs, isLoading: packsLoading } = useCollection<Pack>(packsQuery);
-  const cardsQuery = useMemo(() => collection(firestore, 'cards'), [firestore]);
+  const cardsQuery = useMemoFirebase(() => collection(firestore, 'cards'), [firestore]);
   const { data: allCards, isLoading: cardsLoading } = useCollection<CardType>(cardsQuery);
   
-  const userDocRef = useMemo(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: userData } = useDoc<User>(userDocRef);
 
 

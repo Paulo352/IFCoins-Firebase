@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Boxes, Users, Medal, Award, Book } from 'lucide-react';
 import { CoinIcon } from '@/components/icons';
-import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import type { User as UserType } from '@/lib/types';
 import { doc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useMemo, useState, useEffect } from 'react';
@@ -19,14 +19,14 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const [collectionSize, setCollectionSize] = useState(0);
 
-  const userDocRef = useMemo(() => {
+  const userDocRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
   const { data: userData, isLoading: isUserLoading } = useDoc<UserType>(userDocRef);
   
-  const userCardsCollection = useMemo(() => {
+  const userCardsCollection = useMemoFirebase(() => {
       if (!user) return null;
       return collection(firestore, 'users', user.uid, 'cards');
   }, [firestore, user]);
@@ -41,9 +41,9 @@ export default function DashboardPage() {
   }, [userCards]);
 
   // Admin stats
-  const allUsersQuery = useMemo(() => collection(firestore, 'users'), [firestore]);
+  const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection(allUsersQuery);
-  const allCardsQuery = useMemo(() => collection(firestore, 'cards'), [firestore]);
+  const allCardsQuery = useMemoFirebase(() => collection(firestore, 'cards'), [firestore]);
   const { data: allCards, isLoading: isAllCardsLoading } = useCollection(allCardsQuery);
 
   const userRole = userData?.role;

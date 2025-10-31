@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Repeat, Check, X } from 'lucide-react';
 import { CoinIcon } from '@/components/icons';
-import { useFirestore, useUser, useCollection, useDoc } from '@/firebase';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, runTransaction, getDocs } from 'firebase/firestore';
 import type { User as UserType, Card as CardType, Trade } from '@/lib/types';
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -131,8 +131,8 @@ export default function TradesPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Queries for trades
-    const incomingTradesQuery = useMemo(() => user ? query(collection(firestore, 'trades'), where('toUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
-    const outgoingTradesQuery = useMemo(() => user ? query(collection(firestore, 'trades'), where('fromUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
+    const incomingTradesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'trades'), where('toUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
+    const outgoingTradesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'trades'), where('fromUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
     
     const { data: incomingTrades, isLoading: loadingIncoming } = useCollection<Trade>(incomingTradesQuery);
     const { data: outgoingTrades, isLoading: loadingOutgoing } = useCollection<Trade>(outgoingTradesQuery);

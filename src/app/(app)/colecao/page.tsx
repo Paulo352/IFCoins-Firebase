@@ -1,6 +1,6 @@
 'use client';
 import { CollectibleCard } from '@/components/collectible-card';
-import { useUser, useFirestore, useCollection } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import type { Card, User } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
@@ -12,7 +12,7 @@ export default function CollectionPage() {
   const [collectionCards, setCollectionCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const userCardsCollection = useMemo(() => {
+  const userCardsCollection = useMemoFirebase(() => {
       if (!user) return null;
       return collection(firestore, 'users', user.uid, 'cards');
   }, [firestore, user]);

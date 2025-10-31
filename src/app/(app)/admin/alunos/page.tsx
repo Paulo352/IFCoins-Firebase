@@ -29,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
   addDoc,
   collection,
@@ -101,7 +101,7 @@ export default function AdminPeoplePage() {
 
   const role = form.watch('role');
 
-  const usersQuery = useMemo(
+  const usersQuery = useMemoFirebase(
     () => query(collection(firestore, 'users')),
     [firestore]
   );

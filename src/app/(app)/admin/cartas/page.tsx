@@ -33,7 +33,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import {
   getStorage,
@@ -70,7 +70,7 @@ export default function AdminCardsPage() {
     },
   });
 
-  const cardsQuery = useMemo(
+  const cardsQuery = useMemoFirebase(
     () => collection(firestore, 'cards'),
     [firestore]
   );
