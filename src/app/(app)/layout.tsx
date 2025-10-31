@@ -32,7 +32,7 @@ import { IFCoinIcon } from '@/components/icons';
 import type { User, UserRole } from '@/lib/types';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -73,16 +73,20 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const [appUser, setAppUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole>('student');
-  const [isLoading, setIsLoading] = useState(true);
-  
   const router = useRouter();
+
+  const userDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'users', user.uid) : null),
+    [user, firestore]
+  );
+  const { data: appUser, isLoading: isAppUserLoading } = useDoc<User>(userDocRef);
+  
+  // Simulated role state for UI switching. This should derive from appUser
+  const [displayRole, setDisplayRole] = useState<UserRole>('student');
 
   useEffect(() => {
     // If auth state is still loading, do nothing.
     if (isUserLoading) {
-      setIsLoading(true);
       return;
     }
 
@@ -91,61 +95,52 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       router.push('/');
       return;
     }
+    
+    // If the authenticated user exists, but we are waiting for their firestore document
+    if(user && !appUser && !isAppUserLoading) {
+        const manageUser = async () => {
+            const userRef = doc(firestore, 'users', user.uid);
+            const userDoc = await getDoc(userRef);
 
-    // If we have a user, manage their data in Firestore.
-    const manageUserData = async () => {
-      setIsLoading(true);
-      const userRef = doc(firestore, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-      
-      let userData: User;
-      let needsTokenRefresh = false;
+            if (!userDoc.exists()) {
+                 // User document doesn't exist, this is a first-time login.
+                // Create a new user profile based on email.
+                const newUser: Omit<User, 'id'> = {
+                    email: user.email!,
+                    name: user.displayName || 'Novo Usuário',
+                    role: 'student', // Default role
+                    coins: 0,
+                };
+                
+                if (user.email === 'paulocauan39@gmail.com') {
+                    newUser.role = 'admin';
+                    newUser.name = 'Paulo Cauan (Admin)';
+                    newUser.coins = 9999;
+                } else if (user.email === 'professor@ifpr.edu.br') {
+                    newUser.role = 'teacher';
+                    newUser.name = 'Professor Teste';
+                } else if (user.email?.endsWith('@estudantes.ifpr.edu.br')) {
+                    newUser.name = user.displayName || 'Aluno Teste';
+                }
 
-      if (userDoc.exists()) {
-        // User document already exists, just use its data.
-        userData = userDoc.data() as User;
-      } else {
-        // User document doesn't exist, this is a first-time login.
-        // Create a new user profile based on email.
-        const newUser: Omit<User, 'id'> = {
-          email: user.email!,
-          name: user.displayName || 'Novo Usuário',
-          role: 'student', // Default role
-          coins: 0,
-        };
-
-        if (user.email === 'paulocauan39@gmail.com') {
-          newUser.role = 'admin';
-          newUser.name = 'Paulo Cauan (Admin)';
-          newUser.coins = 9999;
-        } else if (user.email === 'professor@ifpr.edu.br') {
-          newUser.role = 'teacher';
-          newUser.name = 'Professor Teste';
-        } else if (user.email?.endsWith('@estudantes.ifpr.edu.br')) {
-           newUser.name = user.displayName || 'Aluno Teste';
-           // You could add logic here to parse RA/Class from email or display name if needed
+                await setDoc(userRef, newUser);
+                // Force a token refresh to try and pick up any custom claims if the environment supports it
+                await user.getIdToken(true);
+            }
         }
-        
-        // Save the new user document to Firestore.
-        await setDoc(userRef, newUser);
-        userData = { ...newUser, id: user.uid };
-        needsTokenRefresh = true;
-      }
-      
-      if (needsTokenRefresh) {
-        await user.getIdToken(true);
-      }
-      
-      setAppUser(userData);
-      setRole(userData.role);
-      setIsLoading(false);
-    };
-
-    manageUserData();
-  }, [user, isUserLoading, firestore, router]);
+        manageUser();
+    }
 
 
-  if (isLoading) {
+    if (appUser) {
+      setDisplayRole(appUser.role);
+    }
+  }, [user, isUserLoading, firestore, router, appUser, isAppUserLoading]);
+
+
+  const isLoading = isUserLoading || isAppUserLoading;
+
+  if (isLoading || !appUser) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -156,7 +151,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const currentNav = navItems[role];
+  const currentNav = navItems[displayRole];
 
   return (
     <SidebarProvider>
@@ -185,7 +180,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <RoleSwitcher currentRole={role} setRole={setRole} />
+          <RoleSwitcher currentRole={displayRole} setRole={setDisplayRole} />
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

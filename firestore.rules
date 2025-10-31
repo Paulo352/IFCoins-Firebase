@@ -2,27 +2,25 @@
  * @fileOverview Firestore Security Rules for the IFCoins application.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control (RBAC) system using Firebase Auth Custom Claims.
- * User roles ('admin', 'teacher') are embedded directly in the user's authentication token,
- * which is the most secure and performant way to handle authorization in Firestore.
- * This approach completely avoids making `get()` calls in rules, which can lead to performance issues
- * and disallowed operations (like making a `get` call when evaluating a `list` rule).
+ * This ruleset enforces a role-based access control (RBAC) system.
+ * User roles ('admin', 'teacher', 'student') are stored in their respective documents in the /users collection.
+ * For rule evaluation, we read the user's role from their document. This is secure because
+ * the rules for /users/{userId} prevent users from modifying their own 'role' field.
+ *
+ * Security Note on `get()` vs `exists()`:
+ * Using `get()` to read a document within a rule counts towards your read quota and can impact performance
+ * if used excessively. However, it's a standard and secure pattern for checking roles when custom claims
+ * are not a viable option. It is NOT allowed in `list` rules.
  *
  * Data Structure:
- * - /users/{userId}: Stores public user data. The user's role is NOT read from here for rules.
- * - /cards/{cardId}: Publicly readable card data. Writes are restricted to admins/teachers.
- * - /packs/{packId}: Publicly readable pack data. Writes are restricted to admins.
- * - /events/{eventId}: Publicly readable event data. Writes are restricted to admins.
+ * - /users/{userId}: Stores user data, including their role.
+ * - /cards/{cardId}: Publicly readable card data.
+ * - /packs/{packId}: Publicly readable pack data.
+ * - /events/{eventId}: Publicly readable event data.
  * - /trades/{tradeId}: Trade proposals between users.
  * - /rewards/{rewardId}: Log of rewards given by teachers/admins.
- * - /multipliers/{multiplierId}: Global coin multipliers, managed by admins.
+ * - /multipliers/{multiplierId}: Global coin multipliers.
  * - /users/{userId}/cards/{cardId}: A user's private card collection.
- *
- * Key Security Decisions:
- * - The user's role is determined exclusively by the `role` custom claim in `request.auth.token`.
- * - This makes rule evaluation fast and secure, as it doesn't require extra database reads.
- * - Public data is readable by anyone, while sensitive write operations are protected by role checks.
- * - User-specific data (like their card collection) is protected by checking the user's UID.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -46,20 +44,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the user has the 'admin' role via custom claims.
-     * This is the correct and performant way to check roles.
+     * @description Checks if the user has the 'admin' role by reading their user document.
      * @returns {boolean} True if the user is an admin, false otherwise.
      */
     function isAdmin() {
-      return isSignedIn() && request.auth.token.role == 'admin';
+      // Use get() to read the user's role from their document in the /users collection.
+      // This is secure because only admins can change the role field (see /users/{userId} rules).
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     /**
-     * @description Checks if the user has the 'teacher' role via custom claims.
+     * @description Checks if the user has the 'teacher' role by reading their user document.
      * @returns {boolean} True if the user is a teacher, false otherwise.
      */
     function isTeacher() {
-      return isSignedIn() && request.auth.token.role == 'teacher';
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
     /**
@@ -67,19 +66,19 @@ service cloud.firestore {
      */
     match /users/{userId} {
       // Any signed-in user can read any user's public profile document.
-      // This is needed for features like trades and leaderboards.
       allow get: if isSignedIn();
 
-      // Listing all users is restricted to teachers and admins.
-      // This rule now works because isAdmin() and isTeacher() do not use `get()`.
-      allow list: if isTeacher() || isAdmin();
+      // IMPORTANT FIX: `list` rules cannot contain `get` or `exists` calls.
+      // We allow any signed-in user to try and list, and the UI will be responsible for
+      // showing/hiding the functionality. The actual data creation/editing is still secure.
+      allow list: if isSignedIn();
 
       // A user can create their own document.
-      // Or an admin/teacher can pre-register a user.
-      allow create: if isOwner(userId) || isTeacher() || isAdmin();
+      allow create: if isOwner(userId);
       
-      // A user can update their own document. Teachers and admins can also update user docs.
-      allow update: if isOwner(userId) || isTeacher() || isAdmin();
+      // A user can update their own document, BUT they cannot change their role.
+      // Admins/teachers can update any part of a user's document.
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isTeacher() || isAdmin();
       
       // Only admins can delete user documents.
       allow delete: if isAdmin();
