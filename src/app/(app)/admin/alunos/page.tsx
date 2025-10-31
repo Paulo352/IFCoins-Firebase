@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { UserPlus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,32 +36,62 @@ import {
   doc,
   setDoc,
   query,
-  where,
-  getDocs,
 } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useMemo } from 'react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
+import type { UserRole } from '@/lib/types';
 
 const formSchema = z.object({
-  ra: z.string().min(1, 'O RA é obrigatório.'),
-  email: z
-    .string()
-    .email('E-mail inválido.')
-    .refine(
-      (email) => email.endsWith('@estudantes.ifpr.edu.br'),
-      'O e-mail do estudante deve ser institucional (@estudantes.ifpr.edu.br).'
-    ),
+  role: z.enum(['student', 'teacher'], { required_error: 'Selecione um perfil.'}),
+  ra: z.string().optional(),
+  email: z.string().email('E-mail inválido.'),
   name: z.string().min(1, 'O nome é obrigatório.'),
-  class: z.string().min(1, 'A turma é obrigatória.'),
+  class: z.string().optional(),
+}).refine(data => {
+    if (data.role === 'student') {
+        return !!data.ra && data.ra.length > 0;
+    }
+    return true;
+}, {
+    message: 'O RA é obrigatório para alunos.',
+    path: ['ra'],
+}).refine(data => {
+    if (data.role === 'student') {
+        return !!data.class && data.class.length > 0;
+    }
+    return true;
+}, {
+    message: 'A turma é obrigatória para alunos.',
+    path: ['class'],
+}).refine(data => {
+    if (data.role === 'student') {
+        return data.email.endsWith('@estudantes.ifpr.edu.br');
+    }
+    return true;
+}, {
+    message: 'O e-mail do estudante deve ser institucional (@estudantes.ifpr.edu.br).',
+    path: ['email'],
+}).refine(data => {
+    if (data.role === 'teacher') {
+        return data.email.endsWith('@ifpr.edu.br');
+    }
+    return true;
+}, {
+    message: 'O e-mail do professor deve ser institucional (@ifpr.edu.br).',
+    path: ['email'],
 });
 
-export default function AdminStudentsPage() {
+
+export default function AdminPeoplePage() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      role: 'student',
       ra: '',
       email: '',
       name: '',
@@ -70,72 +99,113 @@ export default function AdminStudentsPage() {
     },
   });
 
-  const studentsQuery = useMemo(
-    () => query(collection(firestore, 'users'), where('role', '==', 'student')),
+  const role = form.watch('role');
+
+  const usersQuery = useMemo(
+    () => query(collection(firestore, 'users')),
     [firestore]
   );
-  const { data: students, isLoading } = useCollection(studentsQuery);
+  const { data: users, isLoading } = useCollection(usersQuery);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      // This is a simplified user creation.
-      // In a real app, you would use Firebase Admin SDK on a backend to create a user
-      // and then save their data to Firestore.
-      // For this client-side example, we'll just add them to the 'users' collection.
-      // The user will need to have their password set up separately.
-      
-      const userRef = await addDoc(collection(firestore, 'users'), {
-        ra: values.ra,
+      const userData: any = {
         email: values.email,
         name: values.name,
-        class: values.class,
-        role: 'student',
+        role: values.role,
         coins: 0,
         collection: {},
-      });
+      };
 
+      if (values.role === 'student') {
+        userData.ra = values.ra;
+        userData.class = values.class;
+      }
+
+      const userRef = await addDoc(collection(firestore, 'users'), userData);
       await setDoc(doc(firestore, 'users', userRef.id), { id: userRef.id }, { merge: true });
 
       toast({
-        title: 'Aluno Cadastrado!',
-        description: `O aluno ${values.name} foi adicionado com sucesso.`,
+        title: 'Usuário Cadastrado!',
+        description: `O usuário ${values.name} foi adicionado com sucesso.`,
       });
       form.reset();
     } catch (error) {
-      console.error('Error creating student:', error);
+      console.error('Error creating user:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao cadastrar',
         description:
-          'Não foi possível cadastrar o aluno. Tente novamente.',
+          'Não foi possível cadastrar o usuário. Tente novamente.',
       });
     }
   }
 
+  const roleLabels: Record<UserRole, string> = {
+    student: 'Aluno',
+    teacher: 'Professor',
+    admin: 'Admin',
+  };
+
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Gerenciar Alunos</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Gerenciar Pessoas</h1>
         <p className="text-muted-foreground">
-          Cadastre novos alunos no sistema.
+          Cadastre novos alunos e professores no sistema.
         </p>
       </div>
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Cadastrar Novo Aluno</CardTitle>
+          <CardTitle>Cadastrar Nova Pessoa</CardTitle>
           <CardDescription>
-            O aluno será adicionado ao sistema. A criação de senha é feita no primeiro login.
+            A criação de senha é feita no primeiro login do usuário.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Perfil do Usuário</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="student" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Aluno
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="teacher" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Professor
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome do Aluno</FormLabel>
+                    <FormLabel>Nome Completo</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome Completo" {...field} />
                     </FormControl>
@@ -143,32 +213,37 @@ export default function AdminStudentsPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="ra"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>RA do Aluno</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 2023001" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="class"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Turma</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 2A INFO" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {role === 'student' && (
+                <>
+                    <FormField
+                        control={form.control}
+                        name="ra"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>RA do Aluno</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Ex: 2023001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="class"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Turma</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Ex: 2A INFO" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                </>
+              )}
+              
               <FormField
                 control={form.control}
                 name="email"
@@ -178,7 +253,7 @@ export default function AdminStudentsPage() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="aluno@estudantes.ifpr.edu.br"
+                        placeholder={role === 'student' ? "aluno@estudantes.ifpr.edu.br" : "professor@ifpr.edu.br"}
                         {...field}
                       />
                     </FormControl>
@@ -188,7 +263,7 @@ export default function AdminStudentsPage() {
               />
               <Button type="submit" className="w-full">
                 <UserPlus className="mr-2 h-4 w-4" />
-                Cadastrar Aluno
+                Cadastrar Usuário
               </Button>
             </form>
           </Form>
@@ -196,13 +271,14 @@ export default function AdminStudentsPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Alunos Registrados</CardTitle>
+          <CardTitle>Usuários Registrados</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Aluno</TableHead>
+                <TableHead>Usuário</TableHead>
+                <TableHead>Perfil</TableHead>
                 <TableHead>RA</TableHead>
                 <TableHead>Turma</TableHead>
                 <TableHead>Email</TableHead>
@@ -211,34 +287,35 @@ export default function AdminStudentsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
+                  <TableCell colSpan={5} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
-              ) : students && students.length > 0 ? (
-                students.map((student) => (
-                  <TableRow key={student.id}>
+              ) : users && users.length > 0 ? (
+                users.map((user) => (
+                  <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
                           <AvatarImage
-                            src={`https://avatar.vercel.sh/${student.id}.png`}
-                            alt={student.name}
+                            src={`https://avatar.vercel.sh/${user.id}.png`}
+                            alt={user.name}
                           />
-                          <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <span>{student.name}</span>
+                        <span>{user.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{student.ra}</TableCell>
-                     <TableCell>{student.class}</TableCell>
-                    <TableCell>{student.email}</TableCell>
+                    <TableCell><Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>{roleLabels[user.role as UserRole] || 'N/A'}</Badge></TableCell>
+                    <TableCell>{user.ra || 'N/A'}</TableCell>
+                     <TableCell>{user.class || 'N/A'}</TableCell>
+                    <TableCell>{user.email}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
-                    Nenhum aluno registrado.
+                  <TableCell colSpan={5} className="text-center">
+                    Nenhum usuário registrado.
                   </TableCell>
                 </TableRow>
               )}
