@@ -333,7 +333,8 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "google.com"
     ]
   },
   "firestore": {
@@ -490,3 +491,4 @@
     "reasoning": "The Firestore data structure is designed to support the IFCoins application, focusing on authorization independence, clarity, and scalability. It leverages path-based ownership for user-specific data and membership maps for collaborative data. \n\n*   **Authorization Independence**: Critical authorization data (e.g., members, owners) is denormalized into subcollections to avoid `get()` calls in security rules. This ensures atomic operations and simplifies security rule logic.\n*   **Structural Segregation**: Data with different access requirements are stored in separate collections (e.g., `/users/{userId}/cards` for private user card collections, `/cards` for publicly available cards).\n*   **Access Modeling**: The structure uses path-based ownership (`/users/{userId}/...`) and membership maps to clearly define data ownership and access rights.\n\n**QAPs Support:**\n\n*   Secure `list` operations are enabled by ensuring that each collection has a homogeneous security posture.  For example, listing cards in `/cards` is allowed based on the 'available' field, whereas listing cards in `/users/{userId}/cards` is restricted to the owning user.\n\n*   The use of dedicated collections for global roles (`/roles_admin/{uid}`) allows for efficient and secure role-based access control.\n\nThe design anticipates future scalability needs by promoting flat data structures within documents, avoiding deeply nested data that can impact performance."
   }
 }
+    

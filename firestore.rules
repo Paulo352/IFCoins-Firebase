@@ -9,9 +9,9 @@
  *
  * Data Structure:
  * - /users/{userId}: Stores personal user data, accessible only to the user.
- * - /cards/{cardId}: Stores card data, publicly readable.
- * - /packs/{packId}: Stores pack data, publicly readable.
- * - /events/{eventId}: Stores event data, publicly readable.
+ * - /cards/{cardId}: Stores card data, publicly readable. Admins can create/update.
+ * - /packs/{packId}: Stores pack data, publicly readable. Admins can create/update.
+ * - /events/{eventId}: Stores event data, publicly readable. Admins can create/update.
  * - /trades/{tradeId}: Stores trade data.
  * - /rewards/{rewardId}: Stores reward data.
  * - /multipliers/{multiplierId}: Stores multiplier data.
@@ -21,9 +21,9 @@
  * Key Security Decisions:
  * - Users can only access their own data under /users/{userId}.
  * - Listing users is disallowed to protect user privacy.
- * - Data types are not validated beyond authorization-critical fields in this prototyping phase.
  * - Public collections (/cards, /packs, /events, /multipliers) are readable by all.
- * - No write operations are allowed on the /roles_admin collection to restrict admin role assignments.
+ * - Write operations on core game data (/cards, /packs, /events) are restricted to admins.
+ * - No write operations are allowed on the /roles_admin collection to restrict admin role assignments from client.
  *
  * Denormalization for Authorization:
  *  - The rules leverage path-based ownership and existence checks in the `/roles_admin` collection to avoid costly `get()` operations.
@@ -77,12 +77,12 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes, restricts read access to the owner.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // Prevent listing of all users for privacy
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin(); 
 
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
@@ -90,16 +90,13 @@ service cloud.firestore {
      * @path /cards/{cardId}
      * @allow (get) Any user can read card data.
      * @allow (list) Any user can list available cards.
-     * @deny (create) No user can create cards.
-     * @deny (update) No user can update cards.
-     * @principle Allows public read access.
+     * @allow (create, update) Only admins can create or update cards.
+     * @principle Allows public read access, admin-only writes.
      */
     match /cards/{cardId} {
       allow get: if true;
       allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     /**
@@ -107,16 +104,13 @@ service cloud.firestore {
      * @path /packs/{packId}
      * @allow (get) Any user can read pack data.
      * @allow (list) Any user can list available packs.
-     * @deny (create) No user can create packs.
-     * @deny (update) No user can update packs.
-     * @principle Allows public read access.
+     * @allow (create, update) Only admins can create or update packs.
+     * @principle Allows public read access, admin-only writes.
      */
     match /packs/{packId} {
       allow get: if true;
       allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     /**
@@ -124,46 +118,42 @@ service cloud.firestore {
      * @path /events/{eventId}
      * @allow (get) Any user can read event data.
      * @allow (list) Any user can list events.
-     * @deny (create) No user can create events.
-     * @deny (update) No user can update events.
-     * @principle Allows public read access.
+     * @allow (create, update) Only admins can create or update events.
+     * @principle Allows public read access, admin-only writes.
      */
     match /events/{eventId} {
       allow get: if true;
       allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     /**
      * @description Rules for the /trades/{tradeId} collection.
      * @path /trades/{tradeId}
-     * @allow (get) Any user can read trade data.
-     * @allow (list) Any user can list trades.
-     * @deny (create) No user can create trades.
-     * @deny (update) No user can update trades.
+     * @allow (get) Any signed in user can read trade data.
+     * @allow (list) Any signed in user can list trades.
+     * @allow (create) Signed in users can create trades.
+     * @allow (update) Only involved users can update a trade's status.
      */
     match /trades/{tradeId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
     }
 
     /**
      * @description Rules for the /rewards/{rewardId} collection.
      * @path /rewards/{rewardId}
-     * @allow (get) Any user can read reward data.
-     * @allow (list) Any user can list rewards.
-     * @deny (create) No user can create rewards.
-     * @deny (update) No user can update rewards.
+     * @allow (get) Any signed in user can read reward data.
+     * @allow (list) Any signed in user can list rewards.
+     * @allow (create) Admins and teachers can create rewards.
      */
     match /rewards/{rewardId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isAdmin(); // Assuming teachers will have a specific role check later
       allow update: if false;
       allow delete: if false;
     }
@@ -173,15 +163,12 @@ service cloud.firestore {
      * @path /multipliers/{multiplierId}
      * @allow (get) Any user can read multiplier data.
      * @allow (list) Any user can list multipliers.
-     * @deny (create) No user can create multipliers.
-     * @deny (update) No user can update multipliers.
+     * @allow (create, update) Only admins can manage multipliers.
      */
     match /multipliers/{multiplierId} {
       allow get: if true;
       allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     /**
@@ -189,7 +176,7 @@ service cloud.firestore {
      * @path /users/{userId}/cards/{cardId}
      * @allow (get) User 'user_abc' can read their own card if authenticated.
      * @deny (get) User 'user_xyz' cannot read User 'user_abc' card.
-     * @principle Enforces document ownership for reads.
+     * @principle Enforces document ownership for reads and writes.
      */
     match /users/{userId}/cards/{cardId} {
       allow get: if isOwner(userId);
@@ -203,9 +190,7 @@ service cloud.firestore {
        * @description Rules for the /roles_admin/{userId} collection.
        * @path /roles_admin/{userId}
        * @allow (get) Only admins can check for other admins.
-       * @deny (create) No one can create admin roles through the client.
-       * @deny (update) No one can update admin roles through the client.
-       * @deny (delete) No one can delete admin roles through the client.
+       * @deny (create, update, delete) No one can modify admin roles through the client.
        * @principle Role-based access control.
        */
     match /roles_admin/{userId} {
@@ -217,3 +202,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
