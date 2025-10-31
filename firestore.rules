@@ -20,7 +20,7 @@
  *
  * Key Security Decisions:
  * - Users can only access their own data under /users/{userId}.
- * - Listing users is disallowed to protect user privacy.
+ * - Listing users is disallowed to protect user privacy, except for admins and teachers.
  * - Public collections (/cards, /packs, /events, /multipliers) are readable by all.
  * - Write operations on core game data (/cards, /packs, /events) are restricted to admins.
  * - No write operations are allowed on the /roles_admin collection to restrict admin role assignments from client.
@@ -66,6 +66,14 @@ service cloud.firestore {
     function isAdmin() {
       return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
+    
+    /**
+     * @description Checks if the user has the 'teacher' role.
+     * @returns {boolean} True if the user is a teacher, false otherwise.
+     */
+    function isTeacher() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+    }
 
     /**
      * @description Rules for the /users/{userId} collection.
@@ -78,10 +86,10 @@ service cloud.firestore {
      */
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin(); 
+      allow list: if isAdmin() || isTeacher(); 
 
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin() || isTeacher();
       allow delete: if isAdmin();
     }
 
@@ -96,7 +104,7 @@ service cloud.firestore {
     match /cards/{cardId} {
       allow get: if true;
       allow list: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin() || isTeacher();
     }
 
     /**
@@ -153,7 +161,7 @@ service cloud.firestore {
     match /rewards/{rewardId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if isAdmin(); // Assuming teachers will have a specific role check later
+      allow create: if isAdmin() || isTeacher(); 
       allow update: if false;
       allow delete: if false;
     }
@@ -202,5 +210,3 @@ service cloud.firestore {
     }
   }
 }
-
-    

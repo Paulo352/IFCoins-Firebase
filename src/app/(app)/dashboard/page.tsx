@@ -39,14 +39,22 @@ export default function DashboardPage() {
       setCollectionSize(total);
     }
   }, [userCards]);
+  
+  const userRole = userData?.role;
 
   // Admin stats
-  const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const allUsersQuery = useMemoFirebase(() => {
+    if (!firestore || userRole !== 'admin') return null;
+    return collection(firestore, 'users')
+  }, [firestore, userRole]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection(allUsersQuery);
-  const allCardsQuery = useMemoFirebase(() => collection(firestore, 'cards'), [firestore]);
+  
+  const allCardsQuery = useMemoFirebase(() => {
+    if (!firestore || userRole !== 'admin') return null;
+    return collection(firestore, 'cards')
+  }, [firestore, userRole]);
   const { data: allCards, isLoading: isAllCardsLoading } = useCollection(allCardsQuery);
 
-  const userRole = userData?.role;
 
   const CardSkeleton = () => (
     <Card>
@@ -117,7 +125,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Teacher Cards */}
-            {userRole === 'teacher' && (
+            {(userRole === 'teacher' || userRole === 'admin') && (
               <Card className="md:col-span-2 lg:col-span-1">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -140,13 +148,13 @@ export default function DashboardPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Total de Alunos
+                      Total de Usuários
                     </CardTitle>
                     <Users className="h-5 w-5 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                        {isAllUsersLoading ? '...' : allUsers?.filter(u => u.role === 'student').length ?? 0}
+                        {isAllUsersLoading ? '...' : allUsers?.length ?? 0}
                     </div>
                     {/* <p className="text-xs text-muted-foreground">
                       +5 novos registros
