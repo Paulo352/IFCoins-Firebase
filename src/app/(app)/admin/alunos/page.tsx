@@ -49,8 +49,8 @@ const formSchema = z.object({
     .string()
     .email('E-mail inválido.')
     .refine(
-      (email) => email.endsWith('@ifpr.edu.br'),
-      'O e-mail deve ser institucional (@ifpr.edu.br).'
+      (email) => email.endsWith('@estudantes.ifpr.edu.br'),
+      'O e-mail do estudante deve ser institucional (@estudantes.ifpr.edu.br).'
     ),
   name: z.string().min(1, 'O nome é obrigatório.'),
   class: z.string().min(1, 'A turma é obrigatória.'),
@@ -178,7 +178,7 @@ export default function AdminStudentsPage() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="aluno@ifpr.edu.br"
+                        placeholder="aluno@estudantes.ifpr.edu.br"
                         {...field}
                       />
                     </FormControl>
