@@ -68,10 +68,8 @@ service cloud.firestore {
       // Any signed-in user can read any user's public profile document.
       allow get: if isSignedIn();
 
-      // IMPORTANT FIX: `list` rules cannot contain `get` or `exists` calls.
-      // We allow any signed-in user to try and list, and the UI will be responsible for
-      // showing/hiding the functionality. The actual data creation/editing is still secure.
-      allow list: if isSignedIn();
+      // Only teachers or admins can list all users.
+      allow list: if isTeacher() || isAdmin();
 
       // A user can create their own document.
       allow create: if isOwner(userId);
