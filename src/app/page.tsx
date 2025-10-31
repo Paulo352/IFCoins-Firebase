@@ -13,12 +13,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IFCoinIcon } from '@/components/icons';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  UserCredential,
 } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -27,14 +29,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
+  const handleSuccessfulLogin = async (userCredential: UserCredential) => {
+    const user = userCredential.user;
+    if (user.email === 'paulocauan39@gmail.com') {
+      const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+      try {
+        await setDoc(adminRoleRef, { role: 'admin' });
+        console.log('Admin role document created for user:', user.uid);
+      } catch (error) {
+        console.error('Error creating admin role document:', error);
+      }
+    }
+    toast({ title: 'Login bem-sucedido!' });
+    router.push('/dashboard');
+  };
+
   const handleEmailLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: 'Login bem-sucedido!' });
-      router.push('/dashboard');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await handleSuccessfulLogin(userCredential);
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -50,9 +67,8 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-      toast({ title: 'Login com Google bem-sucedido!' });
-      router.push('/dashboard');
+      const userCredential = await signInWithPopup(auth, provider);
+      await handleSuccessfulLogin(userCredential);
     } catch (error) {
       toast({
         variant: 'destructive',
