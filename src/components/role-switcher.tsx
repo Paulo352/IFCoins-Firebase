@@ -12,10 +12,16 @@ import { Label } from './ui/label';
 
 interface RoleSwitcherProps {
   currentRole: UserRole;
-  setRole: Dispatch<SetStateAction<UserRole>>;
+  realRole: UserRole;
+  setRole: Dispatch<SetStateAction<UserRole | undefined>>;
 }
 
-export function RoleSwitcher({ currentRole, setRole }: RoleSwitcherProps) {
+export function RoleSwitcher({ currentRole, realRole, setRole }: RoleSwitcherProps) {
+  // Only admins can switch roles
+  if (realRole !== 'admin') {
+    return null;
+  }
+  
   return (
     <div className="p-2">
       <Label className="text-xs text-muted-foreground">Ver como:</Label>

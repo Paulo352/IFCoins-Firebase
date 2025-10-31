@@ -81,8 +81,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   );
   const { data: appUser, isLoading: isAppUserLoading } = useDoc<User>(userDocRef);
   
-  // Simulated role state for UI switching. This should derive from appUser
-  const [displayRole, setDisplayRole] = useState<UserRole>('student');
+  // This state will hold the role used for UI display, allowing the user to switch it.
+  const [displayRole, setDisplayRole] = useState<UserRole>();
 
   useEffect(() => {
     // If auth state is still loading, do nothing.
@@ -96,7 +96,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    // If the authenticated user exists, but we are waiting for their firestore document
+    // This logic handles the first-time login for a user.
     if(user && !appUser && !isAppUserLoading) {
         const manageUser = async () => {
             const userRef = doc(firestore, 'users', user.uid);
@@ -104,7 +104,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             if (!userDoc.exists()) {
                  // User document doesn't exist, this is a first-time login.
-                // Create a new user profile based on email.
+                 // We will create the user document if it's missing (e.g. from password or Google sign-in)
                 const newUser: Omit<User, 'id'> = {
                     email: user.email!,
                     name: user.displayName || 'Novo Usuário',
@@ -112,6 +112,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     coins: 0,
                 };
                 
+                // Assign special roles based on email
                 if (user.email === 'paulocauan39@gmail.com') {
                     newUser.role = 'admin';
                     newUser.name = 'Paulo Cauan (Admin)';
@@ -119,26 +120,27 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 } else if (user.email === 'professor@ifpr.edu.br') {
                     newUser.role = 'teacher';
                     newUser.name = 'Professor Teste';
-                } else if (user.email?.endsWith('@estudantes.ifpr.edu.br')) {
-                    newUser.name = user.displayName || 'Aluno Teste';
                 }
 
                 await setDoc(userRef, newUser);
-                // Force a token refresh to try and pick up any custom claims if the environment supports it
+                // Force a token refresh to pick up custom claims if the backend is configured for it.
                 await user.getIdToken(true);
             }
         }
         manageUser();
     }
-
-
-    if (appUser) {
-      setDisplayRole(appUser.role);
-    }
   }, [user, isUserLoading, firestore, router, appUser, isAppUserLoading]);
 
+  // This effect sets the initial display role when the appUser data loads.
+  // It only runs once when appUser is first loaded, and won't override user's selection.
+  useEffect(() => {
+    if (appUser && !displayRole) {
+      setDisplayRole(appUser.role);
+    }
+  }, [appUser, displayRole]);
 
-  const isLoading = isUserLoading || isAppUserLoading;
+
+  const isLoading = isUserLoading || isAppUserLoading || !displayRole;
 
   if (isLoading || !appUser) {
     return (
@@ -180,7 +182,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <RoleSwitcher currentRole={displayRole} setRole={setDisplayRole} />
+          <RoleSwitcher currentRole={displayRole} setRole={setDisplayRole} realRole={appUser.role} />
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
