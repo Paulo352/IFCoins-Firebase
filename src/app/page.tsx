@@ -109,7 +109,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
            <h2 className="text-3xl font-bold mb-4">Contas de Teste</h2>
             <p className="text-muted-foreground mb-8">
-                Use as contas abaixo para explorar os diferentes perfis. A senha para todas é <code className="font-bold bg-secondary text-secondary-foreground px-2 py-1 rounded-md">123456</code>.
+                Use as contas abaixo para explorar os diferentes perfis. A senha para todas é <code className="font-bold bg-secondary text-secondary-foreground px-2 py-1 rounded-md">qualquer</code>.
             </p>
             <div className="space-y-4">
                 {testUsers.map((user) => (
