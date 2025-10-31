@@ -30,11 +30,10 @@ import {
 
 import { IFCoinIcon } from '@/components/icons';
 import type { User, UserRole } from '@/lib/types';
-import { users } from '@/lib/data';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const studentNav = [
@@ -82,17 +81,46 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userData } = useDoc<User>(userDocRef);
+  const { data: userData, isLoading: isUserDataLoading } = useDoc<User>(userDocRef);
   
   useEffect(() => {
     if (userData) {
       setAppUser(userData);
       setRole(userData.role);
-    } else if (user && !isUserLoading) {
-        const defaultUser = users.find(u => u.role === 'student')!;
-        setAppUser({ ...defaultUser, id: user.uid, email: user.email!, name: user.displayName || 'Novo Aluno' });
+    } else if (user && !isUserLoading && !isUserDataLoading) {
+        // User is authenticated but doesn't have a doc yet. Let's create one.
+        const createInitialUser = async () => {
+            const userRef = doc(firestore, 'users', user.uid);
+            const userDoc = await getDoc(userRef);
+            if (!userDoc.exists()) {
+                const newUser: User = {
+                    id: user.uid,
+                    email: user.email!,
+                    name: user.displayName || 'Novo Usuário',
+                    role: 'student', // Default role
+                    coins: 0,
+                    collection: {},
+                };
+                 // Special case for admin user
+                if (user.email === 'paulocauan39@gmail.com') {
+                    newUser.role = 'admin';
+                    newUser.name = 'Paulo Cauan';
+                    newUser.coins = 9999;
+                } else if (user.email === 'professor@ifpr.edu.br') {
+                    newUser.role = 'teacher';
+                    newUser.name = 'Professor Teste';
+                } else if (user.email === 'aluno@estudantes.ifpr.edu.br') {
+                    newUser.name = 'Aluno Teste';
+                }
+                
+                await setDoc(userRef, newUser);
+                setAppUser(newUser);
+                setRole(newUser.role);
+            }
+        };
+        createInitialUser();
     }
-  }, [user, userData, isUserLoading]);
+  }, [user, userData, isUserLoading, isUserDataLoading, firestore]);
 
   const router = useRouter();
   useEffect(() => {
