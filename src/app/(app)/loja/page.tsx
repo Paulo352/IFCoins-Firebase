@@ -14,7 +14,7 @@ import Image from 'next/image';
 import { CoinIcon } from '@/components/icons';
 import { ShoppingBag } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
-import { collection, doc, writeBatch, runTransaction } from 'firebase/firestore';
+import { collection, doc, writeBatch, runTransaction, getDoc, setDoc } from 'firebase/firestore';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -86,7 +86,9 @@ export default function ShopPage() {
             if (!userDoc.exists()) {
                 throw "Documento do usuário não existe!";
             }
-            const currentCoins = userDoc.data().coins;
+            const currentUserData = userDoc.data() as User;
+            const currentCoins = currentUserData.coins;
+            
             if (currentCoins < pack.price) {
                 throw "Saldo insuficiente!";
             }
@@ -97,22 +99,24 @@ export default function ShopPage() {
                 obtainedCards.push(getRandomCardByRarity(allCards));
             }
 
-            const newCollection = { ...userDoc.data().collection };
             const newCardsNames: string[] = [];
 
-            obtainedCards.forEach(card => {
-                 const userCardRef = doc(firestore, 'users', user.uid, 'cards', card.id);
-                 const currentQuantity = newCollection[card.id] || 0;
-                 if(currentQuantity === 0) newCardsNames.push(card.name);
+            // We must update the subcollection and the main user doc field
+            for (const card of obtainedCards) {
+              const userCardRef = doc(firestore, 'users', user.uid, 'cards', card.id);
+              const userCardDoc = await transaction.get(userCardRef);
 
-                 newCollection[card.id] = currentQuantity + 1;
-                 transaction.set(userCardRef, { id: card.id, userId: user.uid, cardId: card.id, quantity: currentQuantity + 1}, { merge: true });
-            });
-
-
+              let newQuantity = 1;
+              if (userCardDoc.exists()) {
+                  newQuantity = (userCardDoc.data()?.quantity || 0) + 1;
+              } else {
+                  newCardsNames.push(card.name); // It's a new card for the user
+              }
+              transaction.set(userCardRef, { userId: user.uid, cardId: card.id, quantity: newQuantity }, { merge: true });
+            }
+            
             transaction.update(userRef, { 
                 coins: currentCoins - pack.price,
-                collection: newCollection
             });
 
             toast({
@@ -222,5 +226,3 @@ export default function ShopPage() {
     </div>
   );
 }
-
-    

@@ -10,13 +10,14 @@ import { Boxes, Users, Medal, Award, Book } from 'lucide-react';
 import { CoinIcon } from '@/components/icons';
 import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
 import type { User as UserType } from '@/lib/types';
-import { doc, collection, query, orderBy, limit } from 'firebase/firestore';
-import { useMemo } from 'react';
+import { doc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const [collectionSize, setCollectionSize] = useState(0);
 
   const userDocRef = useMemo(() => {
     if (!user) return null;
@@ -24,16 +25,26 @@ export default function DashboardPage() {
   }, [firestore, user]);
 
   const { data: userData, isLoading: isUserLoading } = useDoc<UserType>(userDocRef);
+  
+  const userCardsCollection = useMemo(() => {
+      if (!user) return null;
+      return collection(firestore, 'users', user.uid, 'cards');
+  }, [firestore, user]);
+
+  const { data: userCards, isLoading: isLoadingUserCards } = useCollection(userCardsCollection);
+
+  useEffect(() => {
+    if (userCards) {
+      const total = userCards.reduce((sum, card) => sum + (card.quantity || 0), 0);
+      setCollectionSize(total);
+    }
+  }, [userCards]);
 
   // Admin stats
   const allUsersQuery = useMemo(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: isAllUsersLoading } = useCollection(allUsersQuery);
   const allCardsQuery = useMemo(() => collection(firestore, 'cards'), [firestore]);
   const { data: allCards, isLoading: isAllCardsLoading } = useCollection(allCardsQuery);
-
-  const collectionSize = userData?.collection
-    ? Object.keys(userData.collection).length
-    : 0;
 
   const userRole = userData?.role;
 
@@ -86,8 +97,8 @@ export default function DashboardPage() {
                 <Boxes className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{collectionSize}</div>
-                <p className="text-xs text-muted-foreground">cartas únicas</p>
+                <div className="text-2xl font-bold">{isLoadingUserCards ? '...' : collectionSize}</div>
+                <p className="text-xs text-muted-foreground">cartas no total</p>
               </CardContent>
             </Card>
             <Card>

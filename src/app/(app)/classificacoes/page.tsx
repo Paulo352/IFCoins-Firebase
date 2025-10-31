@@ -17,25 +17,16 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import type { User } from '@/lib/types';
-import { useMemo } from 'react';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import type { User, User as UserType } from '@/lib/types';
+import { useMemo, useEffect, useState } from 'react';
+
+type UserWithCollectionSize = UserType & { collectionSize: number };
 
 export default function RankingsPage() {
   const firestore = useFirestore();
-
-  const collectorsQuery = useMemo(
-    () =>
-      query(
-        collection(firestore, 'users'),
-        where('role', '==', 'student'),
-        orderBy('collectionSize', 'desc'),
-        limit(10)
-      ),
-    [firestore]
-  );
-  const { data: topCollectors, isLoading: collectorsLoading } =
-    useCollection<User>(collectorsQuery);
+  const [topCollectors, setTopCollectors] = useState<UserWithCollectionSize[]>([]);
+  const [collectorsLoading, setCollectorsLoading] = useState(true);
 
   const richestQuery = useMemo(
     () =>
@@ -50,15 +41,33 @@ export default function RankingsPage() {
   const { data: richestStudents, isLoading: richestLoading } =
     useCollection<User>(richestQuery);
 
-   const getCollectionSize = (user: User) => {
-    if (!user.collection) return 0;
-    return Object.values(user.collection).reduce((sum, quantity) => sum + quantity, 0);
-  };
+  useEffect(() => {
+    const fetchCollectors = async () => {
+      setCollectorsLoading(true);
+      const studentsQuery = query(collection(firestore, 'users'), where('role', '==', 'student'));
+      const studentDocs = await getDocs(studentsQuery);
+      
+      const studentsWithCollectionSize: UserWithCollectionSize[] = [];
 
-  const sortedCollectors = useMemo(() => {
-    if (!topCollectors) return [];
-    return [...topCollectors].sort((a, b) => getCollectionSize(b) - getCollectionSize(a));
-  }, [topCollectors]);
+      for (const studentDoc of studentDocs.docs) {
+          const student = studentDoc.data() as UserType;
+          const userCardsCollection = collection(firestore, 'users', studentDoc.id, 'cards');
+          const userCardsSnapshot = await getDocs(userCardsCollection);
+          let totalCards = 0;
+          userCardsSnapshot.forEach(doc => {
+              totalCards += doc.data().quantity || 0;
+          });
+          studentsWithCollectionSize.push({ ...student, id: studentDoc.id, collectionSize: totalCards });
+      }
+
+      studentsWithCollectionSize.sort((a, b) => b.collectionSize - a.collectionSize);
+      
+      setTopCollectors(studentsWithCollectionSize.slice(0, 10));
+      setCollectorsLoading(false);
+    };
+
+    fetchCollectors();
+  }, [firestore]);
 
 
   return (
@@ -93,8 +102,8 @@ export default function RankingsPage() {
                       Carregando...
                     </TableCell>
                   </TableRow>
-                ) : sortedCollectors.length > 0 ? (
-                  sortedCollectors.map((student, index) => (
+                ) : topCollectors.length > 0 ? (
+                  topCollectors.map((student, index) => (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell>
@@ -112,7 +121,7 @@ export default function RankingsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {getCollectionSize(student)}
+                        {student.collectionSize}
                       </TableCell>
                     </TableRow>
                   ))

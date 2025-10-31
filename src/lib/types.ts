@@ -42,8 +42,8 @@ export type Trade = {
     fromUserName?: string;
     toUserId: string;
     toUserName?: string;
-    offeredCards: string[];
-    requestedCards: string[];
+    offeredCards: string[]; // array of card IDs
+    requestedCards: string[]; // array of card IDs
     offeredCoins: number;
     requestedCoins: number;
     status: 'pending' | 'accepted' | 'rejected';

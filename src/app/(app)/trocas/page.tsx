@@ -12,9 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Repeat, Check, X } from 'lucide-react';
 import { CoinIcon } from '@/components/icons';
 import { useFirestore, useUser, useCollection, useDoc } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, runTransaction, getDocs } from 'firebase/firestore';
 import type { User as UserType, Card as CardType, Trade } from '@/lib/types';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -22,25 +22,39 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import Image from 'next/image';
-import { Badge } from '@/components/ui/badge';
-import { rarityStyles } from '@/lib/data';
 
-// Helper to get docs from Firestore - because the other one was removed
-async function getDocs(query: any) {
-    const { getDocs: gd } = await import('firebase/firestore');
-    return gd(query);
-}
+const TradeItemDetails = ({ trade, fromUser, toUser }: { trade: Trade, fromUser: UserType | null, toUser: UserType | null }) => {
+    return (
+         <DialogDescription className="space-y-4">
+            <div>
+                <p><strong>De:</strong> {fromUser?.name || 'Carregando...'}</p>
+                <p><strong>Para:</strong> {toUser?.name || 'Carregando...'}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <h4 className="font-semibold">Oferecendo</h4>
+                    {trade.offeredCards.length > 0 && <p>{trade.offeredCards.length} carta(s)</p>}
+                    {trade.offeredCoins > 0 && <p>{trade.offeredCoins} IFCoins</p>}
+                </div>
+                 <div>
+                    <h4 className="font-semibold">Pedindo</h4>
+                    {trade.requestedCards.length > 0 && <p>{trade.requestedCards.length} carta(s)</p>}
+                    {trade.requestedCoins > 0 && <p>{trade.requestedCoins} IFCoins</p>}
+                </div>
+            </div>
+        </DialogDescription>
+    );
+};
 
-
-const TradeItemDetails = ({ trade }: { trade: Trade }) => {
+const TradeRow = ({ trade }: { trade: Trade }) => {
     const firestore = useFirestore();
     const [fromUser, setFromUser] = useState<UserType | null>(null);
     const [toUser, setToUser] = useState<UserType | null>(null);
-    
+    const { toast } = useToast();
+    const { user } = useUser();
+
     useEffect(() => {
         const fetchUsers = async () => {
             const fromUserDoc = await getDoc(doc(firestore, 'users', trade.fromUserId));
@@ -51,30 +65,58 @@ const TradeItemDetails = ({ trade }: { trade: Trade }) => {
         }
         fetchUsers();
     }, [trade, firestore]);
+    
+    const handleTradeResponse = async (trade: Trade, accepted: boolean) => {
+        if (!user) return;
+        
+        const tradeRef = doc(firestore, 'trades', trade.id);
+        if (accepted) {
+            // Complex transaction logic would go here to swap items
+            toast({title: 'Funcionalidade em desenvolvimento'});
+            // For now, just update status
+             await updateDoc(tradeRef, { status: 'accepted' });
 
-    if (!fromUser || !toUser) return <p>Carregando detalhes...</p>
+        } else {
+            await updateDoc(tradeRef, { status: 'rejected' });
+            toast({title: 'Troca rejeitada.'});
+        }
+    }
+    
+    const handleCancelTrade = async (tradeId: string) => {
+        await deleteDoc(doc(firestore, 'trades', tradeId));
+        toast({title: 'Proposta cancelada.'});
+    }
+
+    const isIncoming = user?.uid === trade.toUserId;
 
     return (
-         <DialogDescription className="space-y-4">
-            <div>
-                <p><strong>De:</strong> {fromUser.name}</p>
-                <p><strong>Para:</strong> {toUser.name}</p>
+        <Dialog>
+            <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                <DialogTrigger asChild>
+                    <span className="cursor-pointer flex-1">
+                        {isIncoming ? `Proposta de ` : `Proposta para `}
+                        <strong>{isIncoming ? fromUser?.name || '...' : toUser?.name || '...'}</strong>
+                    </span>
+                </DialogTrigger>
+                {isIncoming ? (
+                    <div>
+                        <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade, true)}><Check className="h-4 w-4 text-green-500"/></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade, false)}><X className="h-4 w-4 text-red-500"/></Button>
+                    </div>
+                ) : (
+                    <Button variant="ghost" size="icon" onClick={() => handleCancelTrade(trade.id)}><X className="h-4 w-4"/></Button>
+                )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <h4 className="font-semibold">Oferecendo</h4>
-                    {trade.offeredCards.length > 0 && <p>{trade.offeredCards.join(', ')}</p>}
-                    {trade.offeredCoins > 0 && <p>{trade.offeredCoins} IFCoins</p>}
-                </div>
-                 <div>
-                    <h4 className="font-semibold">Pedindo</h4>
-                    {trade.requestedCards.length > 0 && <p>{trade.requestedCards.join(', ')}</p>}
-                    {trade.requestedCoins > 0 && <p>{trade.requestedCoins} IFCoins</p>}
-                </div>
-            </div>
-        </DialogDescription>
-    );
-};
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Detalhes da Troca</DialogTitle>
+                    <TradeItemDetails trade={trade} fromUser={fromUser} toUser={toUser} />
+                </DialogHeader>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 export default function TradesPage() {
     const { user } = useUser();
@@ -156,34 +198,6 @@ export default function TradesPage() {
         }
     };
 
-    const handleTradeResponse = async (trade: Trade, accepted: boolean) => {
-        if (!user) return;
-        
-        const tradeRef = doc(firestore, 'trades', trade.id);
-        if (accepted) {
-            try {
-                await runTransaction(firestore, async (transaction) => {
-                    // Logic to swap cards and coins
-                    // This is complex and needs careful implementation
-                    // For now, we will just accept it
-                    transaction.update(tradeRef, { status: 'accepted' });
-                });
-                 toast({title: 'Troca aceita!'});
-            } catch (error) {
-                console.error("Trade transaction failed: ", error);
-                toast({ variant: "destructive", title: "Falha na transação da troca." });
-            }
-        } else {
-            await updateDoc(tradeRef, { status: 'rejected' });
-            toast({title: 'Troca rejeitada.'});
-        }
-    }
-    
-    const handleCancelTrade = async (tradeId: string) => {
-        await deleteDoc(doc(firestore, 'trades', tradeId));
-        toast({title: 'Proposta cancelada.'});
-    }
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -252,23 +266,7 @@ export default function TradesPage() {
                 </div>
                 ) : (
                     incomingTrades.map(trade => (
-                        <Dialog key={trade.id}>
-                            <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                                <DialogTrigger asChild>
-                                    <span className="cursor-pointer flex-1">Proposta de <strong>{trade.fromUserName || 'um aluno'}</strong></span>
-                                </DialogTrigger>
-                                <div>
-                                    <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade, true)}><Check className="h-4 w-4 text-green-500"/></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => handleTradeResponse(trade, false)}><X className="h-4 w-4 text-red-500"/></Button>
-                                </div>
-                            </div>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Detalhes da Troca</DialogTitle>
-                                    <TradeItemDetails trade={trade} />
-                                </DialogHeader>
-                            </DialogContent>
-                        </Dialog>
+                        <TradeRow key={trade.id} trade={trade} />
                     ))
                 )}
             </CardContent>
@@ -288,20 +286,7 @@ export default function TradesPage() {
                 </div>
                 ) : (
                      outgoingTrades.map(trade => (
-                         <Dialog key={trade.id}>
-                            <div key={trade.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                                 <DialogTrigger asChild>
-                                    <span className="cursor-pointer flex-1">Proposta para <strong>{trade.toUserName || 'um aluno'}</strong></span>
-                                </DialogTrigger>
-                                <Button variant="ghost" size="icon" onClick={() => handleCancelTrade(trade.id)}><X className="h-4 w-4"/></Button>
-                            </div>
-                             <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Detalhes da Troca</DialogTitle>
-                                     <TradeItemDetails trade={trade} />
-                                </DialogHeader>
-                            </DialogContent>
-                        </Dialog>
+                         <TradeRow key={trade.id} trade={trade} />
                     ))
                 )}
             </CardContent>
