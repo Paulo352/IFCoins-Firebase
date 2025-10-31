@@ -189,7 +189,6 @@ export default function ShopPage() {
                     src={pack.imageUrl}
                     alt={pack.name}
                     fill
-                    data-ai-hint={pack.imageHint}
                     className="object-cover"
                   />
                 </div>
@@ -223,3 +222,5 @@ export default function ShopPage() {
     </div>
   );
 }
+
+    

@@ -474,7 +474,7 @@
       {
         "path": "/roles_admin/{userId}",
         "definition": {
-          "entityName": "user",
+          "entityName": "User",
           "schema": {
             "$ref": "#/backend/entities/User"
           },
