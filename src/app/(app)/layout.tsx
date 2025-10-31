@@ -32,7 +32,7 @@ import { IFCoinIcon } from '@/components/icons';
 import type { User, UserRole } from '@/lib/types';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
