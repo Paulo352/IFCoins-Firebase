@@ -1,3 +1,4 @@
+'use client';
 import {
   Card,
   CardContent,
@@ -6,14 +7,27 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { users } from '@/lib/data';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import type { User } from '@/lib/types';
+import { doc } from 'firebase/firestore';
 
 export default function ProfilePage() {
-  // We'll use the first student as an example, this should be the logged in user
-  const user = users[0];
+  const { user: authUser } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [authUser, firestore]);
+
+  const { data: user, isLoading } = useDoc<User>(userDocRef);
+
+  if (isLoading || !user) {
+    return <div>Carregando perfil...</div>
+  }
 
   return (
     <div className="flex flex-col gap-6">

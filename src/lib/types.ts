@@ -8,7 +8,6 @@ export type User = {
   ra?: string;
   class?: string;
   coins: number;
-  collection: Record<string, number>;
   collectionSize?: number; // Total number of cards
 };
 
@@ -49,3 +48,10 @@ export type Trade = {
     status: 'pending' | 'accepted' | 'rejected';
     createdAt: any; // Firestore Timestamp
 }
+
+export type UserCard = {
+  id: string;
+  userId: string;
+  cardId: string;
+  quantity: number;
+};

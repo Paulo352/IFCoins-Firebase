@@ -42,6 +42,7 @@ import { useMemo } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import type { UserRole } from '@/lib/types';
+import type { User } from '@/lib/types';
 
 const formSchema = z.object({
   role: z.enum(['student', 'teacher'], { required_error: 'Selecione um perfil.'}),
@@ -102,32 +103,34 @@ export default function AdminPeoplePage() {
   const role = form.watch('role');
 
   const usersQuery = useMemoFirebase(
-    () => query(collection(firestore, 'users')),
+    () => (firestore ? query(collection(firestore, 'users')) : null),
     [firestore]
   );
-  const { data: users, isLoading } = useCollection(usersQuery);
+  const { data: users, isLoading } = useCollection<User>(usersQuery);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const userData: any = {
+      const userData: Partial<User> = {
         email: values.email,
         name: values.name,
         role: values.role,
         coins: 0,
-        collection: {},
       };
 
       if (values.role === 'student') {
         userData.ra = values.ra;
         userData.class = values.class;
       }
-
-      const userRef = await addDoc(collection(firestore, 'users'), userData);
-      await setDoc(doc(firestore, 'users', userRef.id), { id: userRef.id }, { merge: true });
+      
+      // We cannot create a user with a specific ID here without a backend function
+      // for creating the user in Firebase Auth.
+      // So we add the document and let AppLayout handle user creation on first login.
+      // A better approach would be a Cloud Function that creates both Auth user and Firestore doc.
+      await addDoc(collection(firestore, 'users'), userData);
 
       toast({
-        title: 'Usuário Cadastrado!',
-        description: `O usuário ${values.name} foi adicionado com sucesso.`,
+        title: 'Pré-cadastro Realizado!',
+        description: `O usuário ${values.name} foi adicionado. Ele precisará fazer o primeiro login para ativar a conta.`,
       });
       form.reset();
     } catch (error) {

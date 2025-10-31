@@ -1,4 +1,4 @@
-import type { User, Card, Pack, Rarity } from './types';
+import type { Rarity } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 function getCardImage(id: string) {
@@ -8,25 +8,6 @@ function getCardImage(id: string) {
         description: "Placeholder description"
     };
 }
-
-export const packs: Pack[] = [
-    {
-        id: 'pack01',
-        name: 'Pacote Básico',
-        price: 25,
-        description: 'Um pacote com cartas básicas para começar sua coleção.',
-        imageUrl: 'https://picsum.photos/seed/pack01/400/560',
-        imageHint: 'treasure chest'
-    },
-    {
-        id: 'pack02',
-        name: 'Pacote Raro Mensal',
-        price: 100,
-        description: 'Contém pelo menos uma carta rara. Limitado por mês.',
-        imageUrl: 'https://picsum.photos/seed/pack02/400/560',
-        imageHint: 'glowing chest'
-    }
-]
 
 export const rarityStyles: Record<Rarity, { class: string, label: string }> = {
     common: { class: 'bg-gray-200 text-gray-800 border-gray-400', label: 'Comum' },

@@ -32,7 +32,7 @@ import { IFCoinIcon } from '@/components/icons';
 import type { User, UserRole } from '@/lib/types';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
-import { useUser, useFirestore, useDoc } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -75,61 +75,76 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const [appUser, setAppUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole>('student');
+  const [isLoading, setIsLoading] = useState(true);
   
-  const userDocRef = useMemo(() => {
-    if (!user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
-
-  const { data: userData, isLoading: isUserDataLoading } = useDoc<User>(userDocRef);
-  
-  useEffect(() => {
-    if (userData) {
-      setAppUser(userData);
-      setRole(userData.role);
-    } else if (user && !isUserLoading && !isUserDataLoading) {
-        // User is authenticated but doesn't have a doc yet. Let's create one.
-        const createInitialUser = async () => {
-            const userRef = doc(firestore, 'users', user.uid);
-            const userDoc = await getDoc(userRef);
-            if (!userDoc.exists()) {
-                const newUser: User = {
-                    id: user.uid,
-                    email: user.email!,
-                    name: user.displayName || 'Novo Usuário',
-                    role: 'student', // Default role
-                    coins: 0,
-                    collection: {},
-                };
-                 // Special case for admin user
-                if (user.email === 'paulocauan39@gmail.com') {
-                    newUser.role = 'admin';
-                    newUser.name = 'Paulo Cauan';
-                    newUser.coins = 9999;
-                } else if (user.email === 'professor@ifpr.edu.br') {
-                    newUser.role = 'teacher';
-                    newUser.name = 'Professor Teste';
-                } else if (user.email === 'aluno@estudantes.ifpr.edu.br') {
-                    newUser.name = 'Aluno Teste';
-                }
-                
-                await setDoc(userRef, newUser);
-                setAppUser(newUser);
-                setRole(newUser.role);
-            }
-        };
-        createInitialUser();
-    }
-  }, [user, userData, isUserLoading, isUserDataLoading, firestore]);
-
   const router = useRouter();
+
   useEffect(() => {
+    // 1. Redirect to login if Firebase auth is done and there's no user
     if (!isUserLoading && !user) {
       router.push('/');
+      return;
     }
-  }, [isUserLoading, user, router]);
+    
+    // 2. If Firebase auth is still loading, we also are loading
+    if (isUserLoading) {
+      setIsLoading(true);
+      return;
+    }
 
-  if (isUserLoading || !appUser) {
+    // 3. If we have a user, manage their data
+    if (user) {
+      const userRef = doc(firestore, 'users', user.uid);
+      
+      const manageUserData = async () => {
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          // User document exists, get their role and update state
+          const userData = userDoc.data() as User;
+          await user.getIdToken(true); // Force refresh token to get latest claims
+          setAppUser(userData);
+          setRole(userData.role);
+          setIsLoading(false);
+        } else {
+          // User is authenticated, but no document. Let's create one.
+          const newUser: User = {
+            id: user.uid,
+            email: user.email!,
+            name: user.displayName || 'Novo Usuário',
+            role: 'student', // Default role
+            coins: 0,
+          };
+          
+          // Special cases for test users and admin
+          if (user.email === 'paulocauan39@gmail.com') {
+            newUser.role = 'admin';
+            newUser.name = 'Paulo Cauan (Admin)';
+            newUser.coins = 9999;
+          } else if (user.email === 'professor@ifpr.edu.br') {
+            newUser.role = 'teacher';
+            newUser.name = 'Professor Teste';
+          } else if (user.email === 'aluno@estudantes.ifpr.edu.br') {
+            newUser.name = 'Aluno Teste';
+            newUser.ra = '2024TESTE';
+            newUser.class = 'TESTE 3A';
+          }
+          
+          await setDoc(userRef, newUser, { merge: true });
+          await user.getIdToken(true); // Force refresh token to get claims on new user
+          
+          setAppUser(newUser);
+          setRole(newUser.role);
+          setIsLoading(false);
+        }
+      };
+
+      manageUserData();
+    }
+  }, [user, isUserLoading, firestore, router]);
+
+
+  if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -178,7 +193,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex-1">
             {/* Can add breadcrumbs here */}
           </div>
-          <UserNav user={appUser} />
+          {appUser && <UserNav user={appUser} />}
         </header>
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </SidebarInset>

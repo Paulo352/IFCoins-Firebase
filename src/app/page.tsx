@@ -36,31 +36,18 @@ export default function LoginPage() {
   const handleSuccessfulLogin = async (userCredential: UserCredential) => {
     const user = userCredential.user;
     
-    // Check user role from Firestore and force a token refresh if they are an admin or teacher
-    // This is necessary to apply custom claims for security rules
+    // This will now be handled by the AppLayout to ensure claims are fresh
+    // on every app load after login. We just need to ensure the user document exists.
     const userDocRef = doc(firestore, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
 
-    if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role === 'admin' || userData.role === 'teacher') {
-            await user.getIdToken(true); // Force refresh to get custom claims
-            if (userData.role === 'admin') {
-              const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-               try {
-                    await setDoc(adminRoleRef, { role: 'admin' }, { merge: true });
-                } catch (error) {
-                    console.error("Failed to set admin role in roles_admin collection", error);
-                }
-            }
-        }
-    } else if (user.email === 'paulocauan39@gmail.com') {
-      // This is a special case for the first-time login of the main admin
-       const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-       await setDoc(adminRoleRef, { role: 'admin' }, { merge: true });
-       await user.getIdToken(true); // Force refresh
+    if (!userDoc.exists()) {
+       // The AppLayout will create the user doc on the next screen if it doesn't exist.
+       // This logic is now centralized. We just log them in.
     }
-
+    
+    // We still force a token refresh on login to be safe.
+    await user.getIdToken(true);
 
     toast({ title: 'Login bem-sucedido!' });
     router.push('/dashboard');
