@@ -85,7 +85,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes, restricts read access to the owner.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      allow get: if isOwner(userId) || isAdmin() || (isTeacher() && request.auth.uid == userId);
       allow list: if isAdmin() || isTeacher(); 
 
       allow create: if isOwner(userId) && request.resource.data.id == userId;
