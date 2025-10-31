@@ -1,3 +1,52 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "card001",
+      "description": "Uma carta comum mostrando o poder da energia solar.",
+      "imageUrl": "https://images.unsplash.com/photo-1521618755572-156ae0cdd74d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxzb2xhciUyMHBhbmVsfGVufDB8fHx8MTc2MTg3MzM2MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "solar panel"
+    },
+    {
+      "id": "card002",
+      "description": "Uma carta rara de um espírito da árvore.",
+      "imageUrl": "https://images.unsplash.com/photo-1672007600086-908f5a6681a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx0cmVlJTIwc3Bpcml0fGVufDB8fHx8MTc2MTk0OTQyMHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tree spirit"
+    },
+    {
+      "id": "card003",
+      "description": "Uma carta lendária de um laboratório futurista.",
+      "imageUrl": "https://images.unsplash.com/photo-1606206873764-fd15e242df52?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzY2llbmNlJTIwbGFifGVufDB8fHx8MTc2MTkxNTAzMnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "science lab"
+    },
+    {
+      "id": "card004",
+      "description": "Carta mítica de um cérebro cibernético.",
+      "imageUrl": "https://images.unsplash.com/photo-1662558275658-6ed96c5e2380?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjeWJlcm5ldGljJTIwYnJhaW58ZW58MHx8fHwxNzYxOTQ5NDIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cybernetic brain"
+    },
+    {
+      "id": "card005",
+      "description": "Carta comum de um livro de feitiços.",
+      "imageUrl": "https://images.unsplash.com/photo-1593381236787-8a537b74efdd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzcGVsbCUyMGJvb2t8ZW58MHx8fHwxNzYxOTQ5NDIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "spell book"
+    },
+    {
+      "id": "card006",
+      "description": "Carta rara de uma horta escolar.",
+      "imageUrl": "https://images.unsplash.com/photo-1586597509713-0757c3592585?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzY2hvb2wlMjBnYXJkZW58ZW58MHx8fHwxNzYxOTQ5NDIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "school garden"
+    },
+    {
+      "id": "card007",
+      "description": "Carta comum de um robô ajudante.",
+      "imageUrl": "https://images.unsplash.com/photo-1634910409614-71a507e13588?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxoZWxwZXIlMjByb2JvdHxlbnwwfHx8fDE3NjE5NDk0MjB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "helper robot"
+    },
+    {
+      "id": "card008",
+      "description": "Carta lendária do mascote da escola.",
+      "imageUrl": "https://images.unsplash.com/photo-1752479910178-1bbeac45da07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzY2hvb2wlMjBtYXNjb3R8ZW58MHx8fHwxNzYxOTQ5NDIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "school mascot"
+    }
+  ]
 }
