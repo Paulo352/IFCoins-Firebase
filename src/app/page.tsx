@@ -20,7 +20,7 @@ import {
   signInWithPopup,
   UserCredential,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -35,20 +35,39 @@ export default function LoginPage() {
 
   const handleSuccessfulLogin = async (userCredential: UserCredential) => {
     const user = userCredential.user;
-    if (user.email === 'paulocauan39@gmail.com') {
-      const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-      try {
-        await setDoc(adminRoleRef, { role: 'admin' });
-        console.log('Admin role document created for user:', user.uid);
-      } catch (error) {
-        console.error('Error creating admin role document:', error);
-      }
+    
+    // Check user role from Firestore and force a token refresh if they are an admin or teacher
+    // This is necessary to apply custom claims for security rules
+    const userDocRef = doc(firestore, "users", user.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData.role === 'admin' || userData.role === 'teacher') {
+            await user.getIdToken(true); // Force refresh to get custom claims
+            if (userData.role === 'admin') {
+              const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+               try {
+                    await setDoc(adminRoleRef, { role: 'admin' }, { merge: true });
+                } catch (error) {
+                    console.error("Failed to set admin role in roles_admin collection", error);
+                }
+            }
+        }
+    } else if (user.email === 'paulocauan39@gmail.com') {
+      // This is a special case for the first-time login of the main admin
+       const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+       await setDoc(adminRoleRef, { role: 'admin' }, { merge: true });
+       await user.getIdToken(true); // Force refresh
     }
+
+
     toast({ title: 'Login bem-sucedido!' });
     router.push('/dashboard');
   };
 
   const handleEmailLogin = async () => {
+    if (!auth) return;
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       await handleSuccessfulLogin(userCredential);
@@ -65,6 +84,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
+    if (!auth) return;
     const provider = new GoogleAuthProvider();
     try {
       const userCredential = await signInWithPopup(auth, provider);
@@ -153,6 +173,7 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
                   />
                 </div>
                 <Button onClick={handleEmailLogin} type="submit" className="w-full">
