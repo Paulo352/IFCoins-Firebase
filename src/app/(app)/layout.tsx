@@ -80,62 +80,63 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/');
-      return;
-    }
-
+    // If auth state is still loading, do nothing.
     if (isUserLoading) {
       setIsLoading(true);
       return;
     }
 
-    if (user) {
-      const userRef = doc(firestore, 'users', user.uid);
-      
-      const manageUserData = async () => {
-        const userDoc = await getDoc(userRef);
-        let userData: User;
+    // If auth has loaded and there's no user, redirect to login.
+    if (!user) {
+      router.push('/');
+      return;
+    }
 
-        if (userDoc.exists()) {
-          userData = userDoc.data() as User;
-        } else {
-          const newUser: User = {
-            id: user.uid,
-            email: user.email!,
-            name: user.displayName || 'Novo Usuário',
-            role: 'student', // Default role
-            coins: 0,
-          };
-          
-          if (user.email === 'paulocauan39@gmail.com') {
-            newUser.role = 'admin';
-            newUser.name = 'Paulo Cauan (Admin)';
-            newUser.coins = 9999;
-          } else if (user.email === 'professor@ifpr.edu.br') {
-            newUser.role = 'teacher';
-            newUser.name = 'Professor Teste';
-          } else if (user.email === 'aluno@estudantes.ifpr.edu.br') {
-            newUser.name = 'Aluno Teste';
-            newUser.ra = '2024TESTE';
-            newUser.class = 'TESTE 3A';
-          }
-          
-          await setDoc(userRef, newUser, { merge: true });
-          userData = newUser;
+    // If we have a user, manage their data in Firestore.
+    const manageUserData = async () => {
+      setIsLoading(true);
+      const userRef = doc(firestore, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      let userData: User;
+
+      if (userDoc.exists()) {
+        // User document already exists, just use its data.
+        userData = userDoc.data() as User;
+      } else {
+        // User document doesn't exist, this is a first-time login.
+        // Create a new user profile based on email.
+        const newUser: User = {
+          id: user.uid,
+          email: user.email!,
+          name: user.displayName || 'Novo Usuário',
+          role: 'student', // Default role
+          coins: 0,
+        };
+
+        if (user.email === 'paulocauan39@gmail.com') {
+          newUser.role = 'admin';
+          newUser.name = 'Paulo Cauan (Admin)';
+          newUser.coins = 9999;
+        } else if (user.email === 'professor@ifpr.edu.br') {
+          newUser.role = 'teacher';
+          newUser.name = 'Professor Teste';
+        } else if (user.email?.endsWith('@estudantes.ifpr.edu.br')) {
+           newUser.name = user.displayName || 'Aluno Teste';
+           // You could add logic here to parse RA/Class from email or display name if needed
         }
         
-        // This is the key part: force a token refresh to get latest claims
-        // This must be done after the user document (the source of the role) is created/read.
-        await user.getIdToken(true); 
-        
-        setAppUser(userData);
-        setRole(userData.role);
-        setIsLoading(false);
-      };
+        // Save the new user document to Firestore.
+        await setDoc(userRef, newUser);
+        userData = newUser;
+      }
+      
+      setAppUser(userData);
+      setRole(userData.role);
+      setIsLoading(false);
+    };
 
-      manageUserData();
-    }
+    manageUserData();
   }, [user, isUserLoading, firestore, router]);
 
 

@@ -5,6 +5,8 @@
  * This ruleset enforces a combination of user-ownership and role-based access control (RBAC).
  * User-specific data is secured using path-based ownership (e.g., /users/{userId}).
  * Privileges (admin, teacher) are granted based on the user's role stored in their document in the /users collection.
+ * This version simplifies rules to avoid "get-before-list" issues by allowing broader reads
+ * on public/semi-public data and focusing restrictions on write operations.
  *
  * Data Structure:
  * - /users/{userId}: Stores personal user data, including their role.
@@ -18,10 +20,9 @@
  *
  * Key Security Decisions:
  * - The user's document in /users is the source of truth for their role.
- * - Users can always read and write their own primary document in `/users/{userId}`.
- * - Listing all users is restricted to teachers and admins to protect privacy.
- * - Public game data (/cards, /packs, /events, /multipliers) is world-readable.
  * - Write operations on core game data are restricted to teachers or admins.
+ * - Listing all users is restricted to teachers and admins to protect privacy.
+ * - Reading individual user profiles is allowed for any signed-in user to enable features like trades and rankings.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -66,16 +67,16 @@ service cloud.firestore {
      * @description Rules for the /users/{userId} collection.
      */
     match /users/{userId} {
-      // Any signed-in user can read their own document.
-      // Teachers and admins can read any user's document.
-      allow get: if isOwner(userId) || isTeacher() || isAdmin();
+      // Any signed-in user can read any user's document.
+      // This is necessary for features like trades and leaderboards.
+      allow get: if isSignedIn();
 
-      // IMPORTANT: Firestore rules for 'list' cannot perform 'get' operations.
-      // Therefore, we must use custom claims for role-based list access.
-      // The logic in the AppLayout now handles setting these claims.
-      allow list: if request.auth.token.role == 'admin' || request.auth.token.role == 'teacher';
+      // Listing all users is restricted to teachers and admins.
+      // This rule works because `list` doesn't do a `get`, but the functions below
+      // that are called from other rules will work because they are in `get` or `write` contexts.
+      allow list: if isTeacher() || isAdmin();
 
-      // A user can create their own document.
+      // A user can create their own document (on first login).
       allow create: if isOwner(userId);
       
       // A user can update their own document. Teachers and admins can also update user docs (e.g. to give coins).
@@ -89,8 +90,7 @@ service cloud.firestore {
      * @description Rules for the /cards/{cardId} collection.
      */
     match /cards/{cardId} {
-      allow get: if true;
-      allow list: if true;
+      allow read: if true;
       allow create, update, delete: if isAdmin() || isTeacher();
     }
 
@@ -98,8 +98,7 @@ service cloud.firestore {
      * @description Rules for the /packs/{packId} collection.
      */
     match /packs/{packId} {
-      allow get: if true;
-      allow list: if true;
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
@@ -107,8 +106,7 @@ service cloud.firestore {
      * @description Rules for the /events/{eventId} collection.
      */
     match /events/{eventId} {
-      allow get: if true;
-      allow list: if true;
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
@@ -116,30 +114,28 @@ service cloud.firestore {
      * @description Rules for the /trades/{tradeId} collection.
      */
     match /trades/{tradeId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+      allow list: if isSignedIn(); // Users can list trades to find their own.
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUserId;
+      allow update: if isSignedIn() && request.auth.uid == resource.data.toUserId; // Only recipient can accept/reject
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.fromUserId; // Only sender can cancel
     }
 
     /**
      * @description Rules for the /rewards/{rewardId} collection.
      */
     match /rewards/{rewardId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isAdmin() || isTeacher(); 
-      allow update: if false;
-      allow delete: if false;
+      allow read: if isSignedIn();
+      allow list: if isTeacher() || isAdmin();
+      allow create: if isTeacher() || isAdmin(); 
+      allow update, delete: if false;
     }
 
     /**
      * @description Rules for the /multipliers/{multiplierId} collection.
      */
     match /multipliers/{multiplierId} {
-      allow get: if true;
-      allow list: if true;
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
@@ -147,6 +143,7 @@ service cloud.firestore {
      * @description Rules for a user's private card collection.
      */
     match /users/{userId}/cards/{cardId} {
+      // A user can only access their own cards.
       allow read, write: if isOwner(userId);
     }
   }
