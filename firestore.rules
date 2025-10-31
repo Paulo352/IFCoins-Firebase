@@ -2,27 +2,27 @@
  * @fileOverview Firestore Security Rules for the IFCoins application.
  *
  * Core Philosophy:
- * This ruleset enforces a combination of user-ownership and role-based access control (RBAC).
- * User-specific data is secured using path-based ownership (e.g., /users/{userId}).
- * Privileges (admin, teacher) are granted based on the user's role stored in their document in the /users collection.
- * This version simplifies rules to avoid "get-before-list" issues by allowing broader reads
- * on public/semi-public data and focusing restrictions on write operations.
+ * This ruleset enforces a role-based access control (RBAC) system using Firebase Auth Custom Claims.
+ * User roles ('admin', 'teacher') are embedded directly in the user's authentication token,
+ * which is the most secure and performant way to handle authorization in Firestore.
+ * This approach completely avoids making `get()` calls in rules, which can lead to performance issues
+ * and disallowed operations (like making a `get` call when evaluating a `list` rule).
  *
  * Data Structure:
- * - /users/{userId}: Stores personal user data, including their role.
- * - /cards/{cardId}: Stores card data, publicly readable. Admins/teachers can write.
- * - /packs/{packId}: Stores pack data, publicly readable. Admins can write.
- * - /events/{eventId}: Stores event data, publicly readable. Admins can write.
- * - /trades/{tradeId}: Stores trade proposals between users.
+ * - /users/{userId}: Stores public user data. The user's role is NOT read from here for rules.
+ * - /cards/{cardId}: Publicly readable card data. Writes are restricted to admins/teachers.
+ * - /packs/{packId}: Publicly readable pack data. Writes are restricted to admins.
+ * - /events/{eventId}: Publicly readable event data. Writes are restricted to admins.
+ * - /trades/{tradeId}: Trade proposals between users.
  * - /rewards/{rewardId}: Log of rewards given by teachers/admins.
  * - /multipliers/{multiplierId}: Global coin multipliers, managed by admins.
  * - /users/{userId}/cards/{cardId}: A user's private card collection.
  *
  * Key Security Decisions:
- * - The user's document in /users is the source of truth for their role.
- * - Write operations on core game data are restricted to teachers or admins.
- * - Listing all users is restricted to teachers and admins to protect privacy.
- * - Reading individual user profiles is allowed for any signed-in user to enable features like trades and rankings.
+ * - The user's role is determined exclusively by the `role` custom claim in `request.auth.token`.
+ * - This makes rule evaluation fast and secure, as it doesn't require extra database reads.
+ * - Public data is readable by anyone, while sensitive write operations are protected by role checks.
+ * - User-specific data (like their card collection) is protected by checking the user's UID.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -46,40 +46,39 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the currently authenticated user has the 'admin' role.
-     * It does this by reading the user's own document from the 'users' collection.
+     * @description Checks if the user has the 'admin' role via custom claims.
+     * This is the correct and performant way to check roles.
      * @returns {boolean} True if the user is an admin, false otherwise.
      */
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isSignedIn() && request.auth.token.role == 'admin';
     }
     
     /**
-     * @description Checks if the currently authenticated user has the 'teacher' role.
-     * It does this by reading the user's own document from the 'users' collection.
+     * @description Checks if the user has the 'teacher' role via custom claims.
      * @returns {boolean} True if the user is a teacher, false otherwise.
      */
     function isTeacher() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+      return isSignedIn() && request.auth.token.role == 'teacher';
     }
 
     /**
      * @description Rules for the /users/{userId} collection.
      */
     match /users/{userId} {
-      // Any signed-in user can read any user's document.
-      // This is necessary for features like trades and leaderboards.
+      // Any signed-in user can read any user's public profile document.
+      // This is needed for features like trades and leaderboards.
       allow get: if isSignedIn();
 
       // Listing all users is restricted to teachers and admins.
-      // This rule works because `list` doesn't do a `get`, but the functions below
-      // that are called from other rules will work because they are in `get` or `write` contexts.
+      // This rule now works because isAdmin() and isTeacher() do not use `get()`.
       allow list: if isTeacher() || isAdmin();
 
-      // A user can create their own document (on first login).
-      allow create: if isOwner(userId);
+      // A user can create their own document.
+      // Or an admin/teacher can pre-register a user.
+      allow create: if isOwner(userId) || isTeacher() || isAdmin();
       
-      // A user can update their own document. Teachers and admins can also update user docs (e.g. to give coins).
+      // A user can update their own document. Teachers and admins can also update user docs.
       allow update: if isOwner(userId) || isTeacher() || isAdmin();
       
       // Only admins can delete user documents.
@@ -90,7 +89,9 @@ service cloud.firestore {
      * @description Rules for the /cards/{cardId} collection.
      */
     match /cards/{cardId} {
+      // All game data like cards is public to read.
       allow read: if true;
+      // Only admins or teachers can manage cards.
       allow create, update, delete: if isAdmin() || isTeacher();
     }
 
@@ -114,36 +115,49 @@ service cloud.firestore {
      * @description Rules for the /trades/{tradeId} collection.
      */
     match /trades/{tradeId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
-      allow list: if isSignedIn(); // Users can list trades to find their own.
+      // Only the sender or receiver of a trade can view it.
+      allow get: if isSignedIn() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+      // Any signed-in user can list trades. They will be filtered on the client-side.
+      allow list: if isSignedIn();
+      // The creator must be the sender of the trade.
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUserId;
-      allow update: if isSignedIn() && request.auth.uid == resource.data.toUserId; // Only recipient can accept/reject
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.fromUserId; // Only sender can cancel
+      // Only the recipient of the trade can accept or reject it.
+      allow update: if isSignedIn() && request.auth.uid == resource.data.toUserId;
+      // Only the sender can cancel (delete) a pending trade.
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
     }
 
     /**
      * @description Rules for the /rewards/{rewardId} collection.
+     * These are records of coins given to students.
      */
     match /rewards/{rewardId} {
+      // Any user can read reward entries (e.g., for a history feed).
       allow read: if isSignedIn();
+      // Listing rewards is limited to teachers and admins.
       allow list: if isTeacher() || isAdmin();
-      allow create: if isTeacher() || isAdmin(); 
+      // Only teachers and admins can create new reward entries.
+      allow create: if isTeacher() || isAdmin();
+      // Rewards are immutable once created.
       allow update, delete: if false;
     }
 
     /**
      * @description Rules for the /multipliers/{multiplierId} collection.
+     * These are global multipliers for events.
      */
     match /multipliers/{multiplierId} {
       allow read: if true;
+      // Only admins can manage global multipliers.
       allow create, update, delete: if isAdmin();
     }
 
     /**
      * @description Rules for a user's private card collection.
+     * This is a sub-collection under a user's document.
      */
     match /users/{userId}/cards/{cardId} {
-      // A user can only access their own cards.
+      // A user can only access their own card collection.
       allow read, write: if isOwner(userId);
     }
   }

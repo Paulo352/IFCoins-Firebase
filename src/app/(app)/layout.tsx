@@ -32,8 +32,8 @@ import { IFCoinIcon } from '@/components/icons';
 import type { User, UserRole } from '@/lib/types';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const studentNav = [
@@ -99,6 +99,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(userRef);
       
       let userData: User;
+      let needsTokenRefresh = false;
 
       if (userDoc.exists()) {
         // User document already exists, just use its data.
@@ -106,8 +107,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       } else {
         // User document doesn't exist, this is a first-time login.
         // Create a new user profile based on email.
-        const newUser: User = {
-          id: user.uid,
+        const newUser: Omit<User, 'id'> = {
           email: user.email!,
           name: user.displayName || 'Novo Usuário',
           role: 'student', // Default role
@@ -128,7 +128,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         
         // Save the new user document to Firestore.
         await setDoc(userRef, newUser);
-        userData = newUser;
+        userData = { ...newUser, id: user.uid };
+        needsTokenRefresh = true;
+      }
+      
+      if (needsTokenRefresh) {
+        await user.getIdToken(true);
       }
       
       setAppUser(userData);
