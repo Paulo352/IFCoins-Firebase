@@ -1,0 +1,492 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the IFCoins system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role (e.g., 'student', 'teacher', 'admin')."
+        },
+        "ra": {
+          "type": "string",
+          "description": "The user's student registration number."
+        },
+        "class": {
+          "type": "string",
+          "description": "The user's class or grade level."
+        },
+        "coins": {
+          "type": "number",
+          "description": "The user's current IFCoins balance."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "role",
+        "coins"
+      ]
+    },
+    "Card": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Card",
+      "type": "object",
+      "description": "Represents a collectible card in the IFCoins system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Card entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the card."
+        },
+        "rarity": {
+          "type": "string",
+          "description": "The rarity of the card (e.g., 'common', 'rare', 'legendary', 'mythic')."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the card's image.",
+          "format": "uri"
+        },
+        "available": {
+          "type": "boolean",
+          "description": "Indicates if the card is currently available for purchase or acquisition."
+        },
+        "copiesAvailable": {
+          "type": "number",
+          "description": "The number of copies of this card that are still available. Null indicates unlimited copies."
+        },
+        "eventId": {
+          "type": "string",
+          "description": "Reference to Event. (Relationship: Event 1:N Card).  If null, the card is not associated with any event."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "rarity",
+        "imageUrl",
+        "available"
+      ]
+    },
+    "Pack": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Pack",
+      "type": "object",
+      "description": "Represents a pack of cards that can be purchased in the IFCoins system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Pack entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the pack."
+        },
+        "available": {
+          "type": "boolean",
+          "description": "Indicates if the pack is currently available for purchase."
+        },
+        "limitPerStudent": {
+          "type": "number",
+          "description": "The maximum number of these packs a student can purchase."
+        },
+        "cardProbabilities": {
+          "type": "array",
+          "description": "Probabilities of obtaining cards of each rarity.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "available",
+        "limitPerStudent",
+        "cardProbabilities"
+      ]
+    },
+    "Event": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Event",
+      "type": "object",
+      "description": "Represents a school event that can affect gameplay in the IFCoins system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Event entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the event."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The start date of the event.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The end date of the event.",
+          "format": "date-time"
+        },
+        "bonusMultiplier": {
+          "type": "number",
+          "description": "A multiplier applied to coin rewards during the event."
+        },
+        "cardIds": {
+          "type": "array",
+          "description": "References to Cards. (Relationship: Event 1:N Card).",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "startDate",
+        "endDate",
+        "bonusMultiplier"
+      ]
+    },
+    "Trade": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Trade",
+      "type": "object",
+      "description": "Represents a trade between two students in the IFCoins system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Trade entity."
+        },
+        "fromUserId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Trade). The user proposing the trade."
+        },
+        "toUserId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Trade). The user receiving the trade proposal."
+        },
+        "offeredCards": {
+          "type": "array",
+          "description": "List of cards offered by the proposer.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offeredCoins": {
+          "type": "number",
+          "description": "Amount of IFCoins offered by the proposer."
+        },
+        "requestedCards": {
+          "type": "array",
+          "description": "List of cards requested by the proposer.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedCoins": {
+          "type": "number",
+          "description": "Amount of IFCoins requested by the proposer."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the trade (e.g., 'pending', 'accepted', 'rejected')."
+        }
+      },
+      "required": [
+        "id",
+        "fromUserId",
+        "toUserId",
+        "status"
+      ]
+    },
+    "Reward": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Reward",
+      "type": "object",
+      "description": "Represents a reward given to a student by a teacher/staff member.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Reward entity."
+        },
+        "teacherId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Reward).  The ID of the teacher/staff member giving the reward."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Reward). The ID of the student receiving the reward."
+        },
+        "coins": {
+          "type": "number",
+          "description": "The number of IFCoins awarded."
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "The timestamp of when the reward was given."
+        },
+        "reason": {
+          "type": "string",
+          "description": "A justification for giving the reward."
+        }
+      },
+      "required": [
+        "id",
+        "teacherId",
+        "studentId",
+        "coins",
+        "timestamp",
+        "reason"
+      ]
+    },
+    "Multiplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Multiplier",
+      "type": "object",
+      "description": "Represents a coin reward multiplier in effect.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Multiplier entity."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Indicates if the multiplier is currently active."
+        },
+        "multiplier": {
+          "type": "number",
+          "description": "The value of the multiplier."
+        },
+        "start": {
+          "type": "string",
+          "description": "The start date and time of the multiplier.",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "description": "The end date and time of the multiplier.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "active",
+        "multiplier",
+        "start",
+        "end"
+      ]
+    },
+    "UserCard": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserCard",
+      "type": "object",
+      "description": "Represents the relationship between a user and a card, including the quantity of each card a user owns.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserCard entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N UserCard). The ID of the user who owns the card."
+        },
+        "cardId": {
+          "type": "string",
+          "description": "Reference to Card. (Relationship: Card 1:N UserCard). The ID of the card the user owns."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the card that the user owns."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "cardId",
+        "quantity"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user data. Uses path-based ownership for private user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/cards/{cardId}",
+        "definition": {
+          "entityName": "Card",
+          "schema": {
+            "$ref": "#/backend/entities/Card"
+          },
+          "description": "Stores card data. The 'available' field controls list access.",
+          "params": [
+            {
+              "name": "cardId",
+              "description": "The unique ID of the card."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/packs/{packId}",
+        "definition": {
+          "entityName": "Pack",
+          "schema": {
+            "$ref": "#/backend/entities/Pack"
+          },
+          "description": "Stores pack data. The 'available' field controls list access.",
+          "params": [
+            {
+              "name": "packId",
+              "description": "The unique ID of the pack."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/events/{eventId}",
+        "definition": {
+          "entityName": "Event",
+          "schema": {
+            "$ref": "#/backend/entities/Event"
+          },
+          "description": "Stores event data.",
+          "params": [
+            {
+              "name": "eventId",
+              "description": "The unique ID of the event."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/trades/{tradeId}",
+        "definition": {
+          "entityName": "Trade",
+          "schema": {
+            "$ref": "#/backend/entities/Trade"
+          },
+          "description": "Stores trade data.",
+          "params": [
+            {
+              "name": "tradeId",
+              "description": "The unique ID of the trade."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/rewards/{rewardId}",
+        "definition": {
+          "entityName": "Reward",
+          "schema": {
+            "$ref": "#/backend/entities/Reward"
+          },
+          "description": "Stores reward data.",
+          "params": [
+            {
+              "name": "rewardId",
+              "description": "The unique ID of the reward."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/multipliers/{multiplierId}",
+        "definition": {
+          "entityName": "Multiplier",
+          "schema": {
+            "$ref": "#/backend/entities/Multiplier"
+          },
+          "description": "Stores multiplier data.",
+          "params": [
+            {
+              "name": "multiplierId",
+              "description": "The unique ID of the multiplier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/cards/{cardId}",
+        "definition": {
+          "entityName": "UserCard",
+          "schema": {
+            "$ref": "#/backend/entities/UserCard"
+          },
+          "description": "Stores the cards a user owns. Uses path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user."
+            },
+            {
+              "name": "cardId",
+              "description": "The unique ID of the card."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate admin role. Existence of doc is sufficient.  Content is not relevant.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the IFCoins application, focusing on authorization independence, clarity, and scalability. It leverages path-based ownership for user-specific data and membership maps for collaborative data. \n\n*   **Authorization Independence**: Critical authorization data (e.g., members, owners) is denormalized into subcollections to avoid `get()` calls in security rules. This ensures atomic operations and simplifies security rule logic.\n*   **Structural Segregation**: Data with different access requirements are stored in separate collections (e.g., `/users/{userId}/cards` for private user card collections, `/cards` for publicly available cards).\n*   **Access Modeling**: The structure uses path-based ownership (`/users/{userId}/...`) and membership maps to clearly define data ownership and access rights.\n\n**QAPs Support:**\n\n*   Secure `list` operations are enabled by ensuring that each collection has a homogeneous security posture.  For example, listing cards in `/cards` is allowed based on the 'available' field, whereas listing cards in `/users/{userId}/cards` is restricted to the owning user.\n\n*   The use of dedicated collections for global roles (`/roles_admin/{uid}`) allows for efficient and secure role-based access control.\n\nThe design anticipates future scalability needs by promoting flat data structures within documents, avoiding deeply nested data that can impact performance."
+  }
+}

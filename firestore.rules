@@ -1,0 +1,219 @@
+/**
+ * @fileOverview Firestore Security Rules for the IFCoins application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a combination of user-ownership and role-based access control.
+ * User-specific data is secured using path-based ownership (e.g., /users/{userId}),
+ * while administrative privileges are granted based on membership in the `/roles_admin/{userId}` collection.
+ * Publicly accessible data (e.g., /cards, /packs) is readable by all users.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores personal user data, accessible only to the user.
+ * - /cards/{cardId}: Stores card data, publicly readable.
+ * - /packs/{packId}: Stores pack data, publicly readable.
+ * - /events/{eventId}: Stores event data, publicly readable.
+ * - /trades/{tradeId}: Stores trade data.
+ * - /rewards/{rewardId}: Stores reward data.
+ * - /multipliers/{multiplierId}: Stores multiplier data.
+ * - /users/{userId}/cards/{cardId}: Stores user-specific card ownership, accessible only to the user.
+ * - /roles_admin/{userId}: Indicates admin role, used for granting elevated privileges.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own data under /users/{userId}.
+ * - Listing users is disallowed to protect user privacy.
+ * - Data types are not validated beyond authorization-critical fields in this prototyping phase.
+ * - Public collections (/cards, /packs, /events, /multipliers) are readable by all.
+ * - No write operations are allowed on the /roles_admin collection to restrict admin role assignments.
+ *
+ * Denormalization for Authorization:
+ *  - The rules leverage path-based ownership and existence checks in the `/roles_admin` collection to avoid costly `get()` operations.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Checks if the user is signed in.
+     * @returns {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId The user ID to compare against the request's auth UID.
+     * @returns {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is the owner of an existing resource.
+     *              It verifies both ownership and existence.
+     * @param {string} userId The user ID to compare against the resource's owner ID.
+     * @returns {boolean} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Checks if the user is an admin.
+     * @returns {boolean} True if the user is an admin, false otherwise.
+     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Rules for the /users/{userId} collection.
+     * @path /users/{userId}
+     * @allow (create) User 'user_abc' can create their own document if authenticated.
+     * @allow (get) User 'user_abc' can read their own document if authenticated.
+     * @deny (create) User 'user_xyz' cannot create a document with ID 'user_abc'.
+     * @deny (update) User 'user_xyz' cannot update User 'user_abc' document.
+     * @principle Enforces document ownership for writes, restricts read access to the owner.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Prevent listing of all users for privacy
+
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rules for the /cards/{cardId} collection.
+     * @path /cards/{cardId}
+     * @allow (get) Any user can read card data.
+     * @allow (list) Any user can list available cards.
+     * @deny (create) No user can create cards.
+     * @deny (update) No user can update cards.
+     * @principle Allows public read access.
+     */
+    match /cards/{cardId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Rules for the /packs/{packId} collection.
+     * @path /packs/{packId}
+     * @allow (get) Any user can read pack data.
+     * @allow (list) Any user can list available packs.
+     * @deny (create) No user can create packs.
+     * @deny (update) No user can update packs.
+     * @principle Allows public read access.
+     */
+    match /packs/{packId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Rules for the /events/{eventId} collection.
+     * @path /events/{eventId}
+     * @allow (get) Any user can read event data.
+     * @allow (list) Any user can list events.
+     * @deny (create) No user can create events.
+     * @deny (update) No user can update events.
+     * @principle Allows public read access.
+     */
+    match /events/{eventId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Rules for the /trades/{tradeId} collection.
+     * @path /trades/{tradeId}
+     * @allow (get) Any user can read trade data.
+     * @allow (list) Any user can list trades.
+     * @deny (create) No user can create trades.
+     * @deny (update) No user can update trades.
+     */
+    match /trades/{tradeId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Rules for the /rewards/{rewardId} collection.
+     * @path /rewards/{rewardId}
+     * @allow (get) Any user can read reward data.
+     * @allow (list) Any user can list rewards.
+     * @deny (create) No user can create rewards.
+     * @deny (update) No user can update rewards.
+     */
+    match /rewards/{rewardId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Rules for the /multipliers/{multiplierId} collection.
+     * @path /multipliers/{multiplierId}
+     * @allow (get) Any user can read multiplier data.
+     * @allow (list) Any user can list multipliers.
+     * @deny (create) No user can create multipliers.
+     * @deny (update) No user can update multipliers.
+     */
+    match /multipliers/{multiplierId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Rules for the /users/{userId}/cards/{cardId} collection.
+     * @path /users/{userId}/cards/{cardId}
+     * @allow (get) User 'user_abc' can read their own card if authenticated.
+     * @deny (get) User 'user_xyz' cannot read User 'user_abc' card.
+     * @principle Enforces document ownership for reads.
+     */
+    match /users/{userId}/cards/{cardId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+      /**
+       * @description Rules for the /roles_admin/{userId} collection.
+       * @path /roles_admin/{userId}
+       * @allow (get) Only admins can check for other admins.
+       * @deny (create) No one can create admin roles through the client.
+       * @deny (update) No one can update admin roles through the client.
+       * @deny (delete) No one can delete admin roles through the client.
+       * @principle Role-based access control.
+       */
+    match /roles_admin/{userId} {
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
