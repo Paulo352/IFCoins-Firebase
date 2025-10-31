@@ -23,6 +23,7 @@ export type Card = {
   copiesAvailable: number | null;
   eventId: string | null;
   description: string;
+  price: number | null;
 };
 
 export type Pack = {

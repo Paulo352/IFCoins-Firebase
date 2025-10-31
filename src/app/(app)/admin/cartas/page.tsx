@@ -18,6 +18,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { BookUp } from 'lucide-react';
 import { rarityStyles } from '@/lib/data';
+import { CoinIcon } from '@/components/icons';
 
 export default function AdminCardsPage() {
   return (
@@ -65,6 +66,13 @@ export default function AdminCardsPage() {
            <div>
             <Label htmlFor="card-quantity">Cópias Disponíveis</Label>
             <Input id="card-quantity" type="number" min="0" placeholder="Deixe em branco para infinito" />
+          </div>
+          <div>
+            <Label htmlFor="card-price">Preço (IFCoins)</Label>
+             <div className="relative">
+                <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input id="card-price" type="number" min="0" placeholder="Opcional, para venda direta" className="pl-10" />
+            </div>
           </div>
           <div>
             <Label htmlFor="card-image">Imagem da Carta</Label>

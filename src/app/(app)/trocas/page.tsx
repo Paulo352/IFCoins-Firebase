@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Repeat } from 'lucide-react';
+import { CoinIcon } from '@/components/icons';
 
 export default function TradesPage() {
   return (
@@ -38,11 +39,25 @@ export default function TradesPage() {
                 (UI de seleção de cartas viria aqui)
               </p>
             </div>
+             <div>
+                <Label htmlFor="coins-offered">IFCoins Oferecidos</Label>
+                 <div className="relative">
+                    <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input id="coins-offered" type="number" min="0" placeholder="0" className="pl-10" />
+                </div>
+            </div>
             <div>
               <Label>Cartas Solicitadas</Label>
               <p className="text-sm text-muted-foreground">
                 (UI de seleção de cartas viria aqui)
               </p>
+            </div>
+             <div>
+                <Label htmlFor="coins-requested">IFCoins Solicitados</Label>
+                 <div className="relative">
+                    <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input id="coins-requested" type="number" min="0" placeholder="0" className="pl-10" />
+                </div>
             </div>
             <Button className="w-full">
               <Repeat className="mr-2 h-4 w-4" />

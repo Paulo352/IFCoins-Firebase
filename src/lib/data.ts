@@ -48,6 +48,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: null,
     eventId: null,
+    price: 10,
   },
   {
     id: 'card002',
@@ -57,6 +58,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: 50,
     eventId: 'event01',
+    price: 50,
   },
   {
     id: 'card003',
@@ -66,6 +68,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: 10,
     eventId: null,
+    price: 200,
   },
   {
     id: 'card004',
@@ -75,6 +78,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: 5,
     eventId: null,
+    price: 500,
   },
   {
     id: 'card005',
@@ -84,6 +88,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: null,
     eventId: null,
+    price: 15,
   },
   {
     id: 'card006',
@@ -93,6 +98,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: null,
     eventId: 'event01',
+    price: 40,
   },
   {
     id: 'card007',
@@ -102,6 +108,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: null,
     eventId: null,
+    price: 5,
   },
   {
     id: 'card008',
@@ -111,6 +118,7 @@ export const cards: Card[] = [
     available: true,
     copiesAvailable: 20,
     eventId: null,
+    price: 250,
   },
 ];
 
