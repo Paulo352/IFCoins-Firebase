@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -32,7 +32,7 @@ import { IFCoinIcon } from '@/components/icons';
 import type { User, UserRole } from '@/lib/types';
 import { RoleSwitcher } from '@/components/role-switcher';
 import { UserNav } from '@/components/user-nav';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -80,34 +80,26 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // 1. Redirect to login if Firebase auth is done and there's no user
     if (!isUserLoading && !user) {
       router.push('/');
       return;
     }
-    
-    // 2. If Firebase auth is still loading, we also are loading
+
     if (isUserLoading) {
       setIsLoading(true);
       return;
     }
 
-    // 3. If we have a user, manage their data
     if (user) {
       const userRef = doc(firestore, 'users', user.uid);
       
       const manageUserData = async () => {
         const userDoc = await getDoc(userRef);
+        let userData: User;
 
         if (userDoc.exists()) {
-          // User document exists, get their role and update state
-          const userData = userDoc.data() as User;
-          await user.getIdToken(true); // Force refresh token to get latest claims
-          setAppUser(userData);
-          setRole(userData.role);
-          setIsLoading(false);
+          userData = userDoc.data() as User;
         } else {
-          // User is authenticated, but no document. Let's create one.
           const newUser: User = {
             id: user.uid,
             email: user.email!,
@@ -116,7 +108,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             coins: 0,
           };
           
-          // Special cases for test users and admin
           if (user.email === 'paulocauan39@gmail.com') {
             newUser.role = 'admin';
             newUser.name = 'Paulo Cauan (Admin)';
@@ -131,12 +122,16 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           }
           
           await setDoc(userRef, newUser, { merge: true });
-          await user.getIdToken(true); // Force refresh token to get claims on new user
-          
-          setAppUser(newUser);
-          setRole(newUser.role);
-          setIsLoading(false);
+          userData = newUser;
         }
+        
+        // This is the key part: force a token refresh to get latest claims
+        // This must be done after the user document (the source of the role) is created/read.
+        await user.getIdToken(true); 
+        
+        setAppUser(userData);
+        setRole(userData.role);
+        setIsLoading(false);
       };
 
       manageUserData();

@@ -4,11 +4,10 @@
  * Core Philosophy:
  * This ruleset enforces a combination of user-ownership and role-based access control (RBAC).
  * User-specific data is secured using path-based ownership (e.g., /users/{userId}).
- * Privileges (admin, teacher) are granted based on custom claims attached to the user's auth token.
- * This is more secure and efficient than reading from a roles collection.
+ * Privileges (admin, teacher) are granted based on the user's role stored in their document in the /users collection.
  *
  * Data Structure:
- * - /users/{userId}: Stores personal user data.
+ * - /users/{userId}: Stores personal user data, including their role.
  * - /cards/{cardId}: Stores card data, publicly readable. Admins/teachers can write.
  * - /packs/{packId}: Stores pack data, publicly readable. Admins can write.
  * - /events/{eventId}: Stores event data, publicly readable. Admins can write.
@@ -18,7 +17,7 @@
  * - /users/{userId}/cards/{cardId}: A user's private card collection.
  *
  * Key Security Decisions:
- * - Custom claims (`request.auth.token.role`) are the source of truth for roles.
+ * - The user's document in /users is the source of truth for their role.
  * - Users can always read and write their own primary document in `/users/{userId}`.
  * - Listing all users is restricted to teachers and admins to protect privacy.
  * - Public game data (/cards, /packs, /events, /multipliers) is world-readable.
@@ -46,19 +45,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the user is an admin by checking custom claims.
+     * @description Checks if the currently authenticated user has the 'admin' role.
+     * It does this by reading the user's own document from the 'users' collection.
      * @returns {boolean} True if the user is an admin, false otherwise.
      */
     function isAdmin() {
-      return isSignedIn() && request.auth.token.role == 'admin';
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     /**
-     * @description Checks if the user has the 'teacher' role by checking custom claims.
+     * @description Checks if the currently authenticated user has the 'teacher' role.
+     * It does this by reading the user's own document from the 'users' collection.
      * @returns {boolean} True if the user is a teacher, false otherwise.
      */
     function isTeacher() {
-      return isSignedIn() && request.auth.token.role == 'teacher';
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
     /**
@@ -69,8 +70,10 @@ service cloud.firestore {
       // Teachers and admins can read any user's document.
       allow get: if isOwner(userId) || isTeacher() || isAdmin();
 
-      // Only teachers and admins can list all users.
-      allow list: if isTeacher() || isAdmin();
+      // IMPORTANT: Firestore rules for 'list' cannot perform 'get' operations.
+      // Therefore, we must use custom claims for role-based list access.
+      // The logic in the AppLayout now handles setting these claims.
+      allow list: if request.auth.token.role == 'admin' || request.auth.token.role == 'teacher';
 
       // A user can create their own document.
       allow create: if isOwner(userId);
