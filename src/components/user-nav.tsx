@@ -45,9 +45,11 @@ export function UserNav({ user }: UserNavProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <UserIcon className="mr-2 h-4 w-4" />
-            <span>Perfil</span>
+          <DropdownMenuItem asChild>
+            <Link href="/perfil">
+              <UserIcon className="mr-2 h-4 w-4" />
+              <span>Perfil</span>
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

@@ -50,6 +50,8 @@ const studentNav = [
 const teacherNav = [
   { href: '/dashboard', label: 'Painel', icon: Home },
   { href: '/recompensar', label: 'Recompensar', icon: PlusCircle },
+  { href: '/admin/alunos', label: 'Gerenciar Alunos', icon: Users },
+  { href: '/admin/cartas', label: 'Gerenciar Cartas', icon: Book },
   { href: '/eventos', label: 'Eventos', icon: Calendar },
   { href: '/classificacoes', label: 'Classificações', icon: Medal },
 ];
