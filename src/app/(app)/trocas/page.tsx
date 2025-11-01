@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Repeat, Check, X } from 'lucide-react';
 import { CoinIcon } from '@/components/icons';
-import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, runTransaction, getDocs } from 'firebase/firestore';
 import type { User as UserType, Card as CardType, Trade } from '@/lib/types';
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -57,7 +57,6 @@ const TradeRow = ({ trade }: { trade: Trade }) => {
 
     useEffect(() => {
         const fetchUsers = async () => {
-            if (!firestore) return;
             const fromUserDoc = await getDoc(doc(firestore, 'users', trade.fromUserId));
             if(fromUserDoc.exists()) setFromUser(fromUserDoc.data() as UserType);
 
@@ -67,61 +66,25 @@ const TradeRow = ({ trade }: { trade: Trade }) => {
         fetchUsers();
     }, [trade, firestore]);
     
-    const handleTradeResponse = (trade: Trade, accepted: boolean) => {
-        if (!user || !firestore) return;
+    const handleTradeResponse = async (trade: Trade, accepted: boolean) => {
+        if (!user) return;
         
         const tradeRef = doc(firestore, 'trades', trade.id);
-        const newStatus = accepted ? 'accepted' : 'rejected';
-        const tradeData = { status: newStatus };
-
         if (accepted) {
-            // For now, just update status and show a toast.
-            // A full implementation would require a complex Cloud Function transaction
-            // to ensure atomicity, which is beyond the scope here.
-            toast({title: 'Funcionalidade de aceitar troca em desenvolvimento.'});
-             updateDoc(tradeRef, tradeData)
-                .then(() => {
-                    toast({ title: 'Troca aceita (simulação).' });
-                })
-                .catch(err => {
-                    const permissionError = new FirestorePermissionError({
-                        path: tradeRef.path,
-                        operation: 'update',
-                        requestResourceData: tradeData
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+            // Complex transaction logic would go here to swap items
+            toast({title: 'Funcionalidade em desenvolvimento'});
+            // For now, just update status
+             await updateDoc(tradeRef, { status: 'accepted' });
 
         } else {
-             updateDoc(tradeRef, tradeData)
-                .then(() => {
-                    toast({title: 'Troca rejeitada.'});
-                })
-                .catch(err => {
-                    const permissionError = new FirestorePermissionError({
-                        path: tradeRef.path,
-                        operation: 'update',
-                        requestResourceData: tradeData
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+            await updateDoc(tradeRef, { status: 'rejected' });
+            toast({title: 'Troca rejeitada.'});
         }
     }
     
-    const handleCancelTrade = (tradeId: string) => {
-        if (!firestore) return;
-        const tradeRef = doc(firestore, 'trades', tradeId);
-        deleteDoc(tradeRef)
-            .then(() => {
-                toast({title: 'Proposta cancelada.'});
-            })
-            .catch(err => {
-                const permissionError = new FirestorePermissionError({
-                    path: tradeRef.path,
-                    operation: 'delete',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+    const handleCancelTrade = async (tradeId: string) => {
+        await deleteDoc(doc(firestore, 'trades', tradeId));
+        toast({title: 'Proposta cancelada.'});
     }
 
     const isIncoming = user?.uid === trade.toUserId;
@@ -144,8 +107,8 @@ const TradeRow = ({ trade }: { trade: Trade }) => {
                     <Button variant="ghost" size="icon" onClick={() => handleCancelTrade(trade.id)}><X className="h-4 w-4"/></Button>
                 )}
             </div>
-             <DialogContent>
-                <DialogHeader>
+            <DialogContent>
+                 <DialogHeader>
                     <DialogTitle>Detalhes da Troca</DialogTitle>
                     <TradeItemDetails trade={trade} fromUser={fromUser} toUser={toUser} />
                 </DialogHeader>
@@ -168,15 +131,15 @@ export default function TradesPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Queries for trades
-    const incomingTradesQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, 'trades'), where('toUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
-    const outgoingTradesQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, 'trades'), where('fromUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
+    const incomingTradesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'trades'), where('toUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
+    const outgoingTradesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'trades'), where('fromUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
     
     const { data: incomingTrades, isLoading: loadingIncoming } = useCollection<Trade>(incomingTradesQuery);
     const { data: outgoingTrades, isLoading: loadingOutgoing } = useCollection<Trade>(outgoingTradesQuery);
 
     const handleSubmitTrade = async () => {
         setIsSubmitting(true);
-        if (!user || !firestore) {
+        if (!user) {
             toast({ variant: 'destructive', title: 'Usuário não logado.' });
             setIsSubmitting(false);
             return;
@@ -208,8 +171,7 @@ export default function TradesPage() {
             }
 
             // Create trade document
-            const tradesCollection = collection(firestore, 'trades');
-            const newTradeData = {
+            await addDoc(collection(firestore, 'trades'), {
                 fromUserId: user.uid,
                 toUserId: targetUserId,
                 offeredCards: offeredCards.map(c => c.id),
@@ -218,33 +180,20 @@ export default function TradesPage() {
                 requestedCoins: requestedCoins,
                 status: 'pending',
                 createdAt: serverTimestamp(),
-            };
+            });
 
-            addDoc(tradesCollection, newTradeData)
-                .then(() => {
-                    toast({ title: 'Proposta de troca enviada!' });
-                    // Reset form
-                    setTargetRa('');
-                    setOfferedCards([]);
-                    setRequestedCards([]);
-                    setOfferedCoins(0);
-                    setRequestedCoins(0);
-                })
-                .catch(err => {
-                     const permissionError = new FirestorePermissionError({
-                        path: tradesCollection.path,
-                        operation: 'create',
-                        requestResourceData: newTradeData
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                })
-                .finally(() => {
-                    setIsSubmitting(false);
-                });
+            toast({ title: 'Proposta de troca enviada!' });
+            // Reset form
+            setTargetRa('');
+            setOfferedCards([]);
+            setRequestedCards([]);
+            setOfferedCoins(0);
+            setRequestedCoins(0);
 
-        } catch (error) { // This will catch errors from getDocs, not from addDoc now
-            console.error("Error finding user for trade: ", error);
-            toast({ variant: 'destructive', title: 'Erro ao criar troca.', description: 'Não foi possível encontrar o usuário de destino.' });
+        } catch (error) {
+            console.error("Error creating trade: ", error);
+            toast({ variant: 'destructive', title: 'Erro ao criar troca.' });
+        } finally {
             setIsSubmitting(false);
         }
     };
