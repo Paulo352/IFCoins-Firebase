@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -34,15 +34,25 @@ import {
   addDoc,
   collection,
   doc,
-  setDoc,
   query,
+  updateDoc,
 } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useMemo } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import type { UserRole } from '@/lib/types';
 import type { User } from '@/lib/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const formSchema = z.object({
   role: z.enum(['student', 'teacher'], { required_error: 'Selecione um perfil.'}),
@@ -143,6 +153,25 @@ export default function AdminPeoplePage() {
       });
     }
   }
+
+  const handleRemovePhoto = async (userId: string) => {
+    if (!firestore) return;
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      await updateDoc(userRef, { photoURL: null });
+      toast({
+        title: 'Foto removida!',
+        description: 'A foto de perfil do usuário foi removida com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error removing photo:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao remover foto',
+        description: 'Não foi possível remover a foto do usuário.',
+      });
+    }
+  };
 
   const roleLabels: Record<UserRole, string> = {
     student: 'Aluno',
@@ -285,12 +314,13 @@ export default function AdminPeoplePage() {
                 <TableHead>RA</TableHead>
                 <TableHead>Turma</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -301,7 +331,7 @@ export default function AdminPeoplePage() {
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
                           <AvatarImage
-                            src={`https://avatar.vercel.sh/${user.id}.png`}
+                            src={user.photoURL || `https://avatar.vercel.sh/${user.id}.png`}
                             alt={user.name}
                           />
                           <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
@@ -313,11 +343,36 @@ export default function AdminPeoplePage() {
                     <TableCell>{user.ra || 'N/A'}</TableCell>
                      <TableCell>{user.class || 'N/A'}</TableCell>
                     <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      {user.photoURL && (
+                         <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Remover foto">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Remoção</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover a foto de perfil de {user.name}? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRemovePhoto(user.id)} className="bg-destructive hover:bg-destructive/90">
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     Nenhum usuário registrado.
                   </TableCell>
                 </TableRow>

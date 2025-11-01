@@ -74,9 +74,10 @@ service cloud.firestore {
       // A user can create their own document (for self-signup).
       allow create: if request.auth.uid == userId;
       
-      // A user can update their own document, BUT they cannot change their role.
-      // Admins/teachers can update any part of a user's document.
-      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isTeacher() || isAdmin();
+      // A user can update their own non-critical data.
+      // Only admins/teachers can update any part of a user's document.
+      // Rules for 'role' and 'coins' are more strict.
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.coins == resource.data.coins) || isTeacher() || isAdmin();
       
       // Only admins can delete user documents.
       allow delete: if isAdmin();

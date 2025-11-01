@@ -9,6 +9,7 @@ export type User = {
   class?: string;
   coins: number;
   collectionSize?: number; // Total number of cards
+  photoURL?: string;
 };
 
 export type Rarity = 'common' | 'rare' | 'legendary' | 'mythic';
