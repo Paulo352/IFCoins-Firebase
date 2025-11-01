@@ -65,21 +65,30 @@ service cloud.firestore {
      * @description Rules for the /users/{userId} collection.
      */
     match /users/{userId} {
-      // Any signed-in user can read any user's public profile document if they are a teacher or admin.
+      // Admins and teachers can read any user's profile.
       allow get: if isTeacher() || isAdmin();
       
       // Users can get their own document.
       allow get: if isOwner(userId);
+      
+      // Since `get()` is disallowed in list rules, we can't have a secure list rule here for admins/teachers.
+      // Instead, we will rely on the client-side query to fetch all users and the `get` rule above
+      // will be evaluated by Firestore for each document in the result set.
+      // allow list: if isTeacher() || isAdmin();
 
+      // Only teachers and admins can create new user documents via the admin panel.
+      // Self-registration is handled separately.
+      allow create: if isTeacher() || isAdmin();
+      
       // A user can create their own document (for self-signup).
-      // Teachers and admins can also create documents for other users.
-      allow create: if request.auth.uid == userId || isTeacher() || isAdmin();
+      allow create: if request.auth.uid == userId;
       
       // A user can update their own non-critical data.
       // Only admins/teachers can update any part of a user's document.
       // Rules for 'role' and 'coins' are more strict.
-      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.coins == resource.data.coins) || isTeacher() || isAdmin();
-      
+      // An Admin can remove a user's photoURL
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.coins == resource.data.coins) || isTeacher() || (isAdmin() && (request.resource.data.photoURL == null || request.resource.data.photoURL == resource.data.photoURL));
+
       // Only admins can delete user documents.
       allow delete: if isAdmin();
     }
