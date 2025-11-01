@@ -18,9 +18,18 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
   UserCredential,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+} from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -41,10 +50,9 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-
   const handleSuccessfulLogin = async (userCredential: UserCredential) => {
     const user = userCredential.user;
-    
+
     await user.getIdToken(true);
 
     toast({ title: 'Login bem-sucedido!' });
@@ -54,7 +62,11 @@ export default function LoginPage() {
   const handleEmailLogin = async () => {
     if (!auth) return;
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       await handleSuccessfulLogin(userCredential);
     } catch (error: any) {
       toast({
@@ -69,17 +81,47 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!auth) return;
+    if (!auth || !firestore) return;
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({
       'login_hint': 'user@example.com',
-       hd: 'ifpr.edu.br' // Uncomment if you want to restrict to a certain domain
+      // hd: 'ifpr.edu.br' // Uncomment to restrict domain
     });
 
     try {
       const userCredential = await signInWithPopup(auth, provider);
-      await handleSuccessfulLogin(userCredential);
+      const googleUser = userCredential.user;
+
+      if (!googleUser.email) {
+        await signOut(auth);
+        toast({
+          variant: 'destructive',
+          title: 'Erro no login com Google',
+          description: 'Não foi possível obter o e-mail da sua conta Google.',
+        });
+        return;
+      }
+      
+      // Check if user exists in Firestore
+      const usersRef = collection(firestore, 'users');
+      const q = query(usersRef, where('email', '==', googleUser.email));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        // User does not exist, sign them out and show an error
+        await signOut(auth);
+        toast({
+          variant: 'destructive',
+          title: 'Usuário não cadastrado',
+          description:
+            'Seu e-mail do Google não foi encontrado. Por favor, use um e-mail já cadastrado ou crie uma nova conta.',
+        });
+      } else {
+        // User exists, proceed with login
+        await handleSuccessfulLogin(userCredential);
+      }
     } catch (error: any) {
+       console.error("Google Sign-in error", error);
       toast({
         variant: 'destructive',
         title: 'Erro no login com Google',
@@ -87,7 +129,7 @@ export default function LoginPage() {
       });
     }
   };
-  
+
   const testUsers = [
     {
       role: 'Admin',
@@ -107,99 +149,108 @@ export default function LoginPage() {
     <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
       <div className="hidden bg-muted lg:flex lg:flex-col lg:items-center lg:justify-center p-12">
         <div className="w-full max-w-md">
-           <h2 className="text-3xl font-bold mb-4">Contas de Teste</h2>
-            <p className="text-muted-foreground mb-8">
-                Use as contas abaixo para explorar os diferentes perfis. A senha para todas é <code className="font-bold bg-secondary text-secondary-foreground px-2 py-1 rounded-md">qualquer</code>.
-            </p>
-            <div className="space-y-4">
-                {testUsers.map((user) => (
-                    <Card key={user.role}>
-                        <CardHeader>
-                            <CardTitle className="text-xl">{user.role}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm font-mono">{user.email}</p>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+          <h2 className="text-3xl font-bold mb-4">Contas de Teste</h2>
+          <p className="text-muted-foreground mb-8">
+            Use as contas abaixo para explorar os diferentes perfis. A senha
+            para todas é{' '}
+            <code className="font-bold bg-secondary text-secondary-foreground px-2 py-1 rounded-md">
+              qualquer
+            </code>
+            .
+          </p>
+          <div className="space-y-4">
+            {testUsers.map((user) => (
+              <Card key={user.role}>
+                <CardHeader>
+                  <CardTitle className="text-xl">{user.role}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm font-mono">{user.email}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
       <div className="flex items-center justify-center py-12">
-          <Card className="mx-auto w-full max-w-sm border-none shadow-none lg:border lg:shadow-sm">
-            <CardHeader className="text-center">
-              <div className="mb-4 flex justify-center">
-                <IFCoinIcon className="h-16 w-16" />
+        <Card className="mx-auto w-full max-w-sm border-none shadow-none lg:border lg:shadow-sm">
+          <CardHeader className="text-center">
+            <div className="mb-4 flex justify-center">
+              <IFCoinIcon className="h-16 w-16" />
+            </div>
+            <CardTitle className="text-2xl font-bold">IFCoins Digital</CardTitle>
+            <CardDescription>Faça login para acessar sua conta</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
-              <CardTitle className="text-2xl font-bold">IFCoins Digital</CardTitle>
-              <CardDescription>Faça login para acessar sua conta</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="password">Senha</Label>
-                    <Link
-                      href="#"
-                      className="ml-auto inline-block text-sm underline"
-                    >
-                      Esqueceu sua senha?
-                    </Link>
-                  </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
-                  />
-                </div>
-                <Button onClick={handleEmailLogin} type="submit" className="w-full">
-                  Entrar
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleGoogleLogin}
-                >
-                  <svg
-                    className="mr-2 h-4 w-4"
-                    aria-hidden="true"
-                    focusable="false"
-                    data-prefix="fab"
-                    data-icon="google"
-                    role="img"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 488 512"
+              <div className="grid gap-2">
+                <div className="flex items-center">
+                  <Label htmlFor="password">Senha</Label>
+                  <Link
+                    href="#"
+                    className="ml-auto inline-block text-sm underline"
                   >
-                    <path
-                      fill="currentColor"
-                      d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 61.9l-76.2 74.2C313.6 113.4 283.6 96 248 96c-106.1 0-192 85.9-192 192s85.9 192 192 192c109.4 0 181.7-75.1 184.8-174.9H248v-95.6h239.2c1.2 12.8 1.8 26.1 1.8 39.4z"
-                    ></path>
-                  </svg>
-                  Entrar com Google
-                </Button>
+                    Esqueceu sua senha?
+                  </Link>
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
+                />
               </div>
-              <div className="mt-4 text-center text-sm">
-                Não tem uma conta?{' '}
-                <Link href="/cadastro" className="underline">
-                  Crie sua conta
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+              <Button
+                onClick={handleEmailLogin}
+                type="submit"
+                className="w-full"
+              >
+                Entrar
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleLogin}
+              >
+                <svg
+                  className="mr-2 h-4 w-4"
+                  aria-hidden="true"
+                  focusable="false"
+                  data-prefix="fab"
+                  data-icon="google"
+                  role="img"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 488 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 61.9l-76.2 74.2C313.6 113.4 283.6 96 248 96c-106.1 0-192 85.9-192 192s85.9 192 192 192c109.4 0 181.7-75.1 184.8-174.9H248v-95.6h239.2c1.2 12.8 1.8 26.1 1.8 39.4z"
+                  ></path>
+                </svg>
+                Entrar com Google
+              </Button>
+            </div>
+            <div className="mt-4 text-center text-sm">
+              Não tem uma conta?{' '}
+              <Link href="/cadastro" className="underline">
+                Crie sua conta
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
