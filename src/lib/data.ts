@@ -1,13 +1,4 @@
 import type { Rarity } from './types';
-import { PlaceHolderImages } from './placeholder-images';
-
-function getCardImage(id: string) {
-    return PlaceHolderImages.find(img => img.id === id) || {
-        imageUrl: `https://picsum.photos/seed/${id}/400/560`,
-        imageHint: "placeholder image",
-        description: "Placeholder description"
-    };
-}
 
 export const rarityStyles: Record<Rarity, { class: string, label: string }> = {
     common: { class: 'bg-gray-200 text-gray-800 border-gray-400', label: 'Comum' },

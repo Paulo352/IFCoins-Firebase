@@ -196,9 +196,9 @@ export default function ShopPage() {
                   <Image
                     src={pack.imageUrl}
                     alt={pack.name}
-                    fill
-                    style={{objectFit: "cover"}}
-                    className="object-cover"
+                    width={400}
+                    height={267}
+                    className="object-cover w-full h-full"
                   />
                 </div>
                 <CardHeader>
