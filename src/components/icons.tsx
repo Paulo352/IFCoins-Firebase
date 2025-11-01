@@ -5,8 +5,8 @@ import Image from 'next/image';
 export function IFCoinIcon({ className, ...props }: SVGProps<SVGSVGElement> & { className?: string }) {
   return (
     <Image
-      src="/ifcoin.png"
-      alt="IFCoin"
+      src="/ifcoins-logo.png"
+      alt="IFCoin Logo"
       width={48}
       height={48}
       className={className}
