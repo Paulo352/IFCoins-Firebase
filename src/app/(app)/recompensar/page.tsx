@@ -8,9 +8,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Award } from 'lucide-react';
+import { Award, Check, ChevronsUpDown } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -23,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import {
   collection,
   query,
@@ -31,11 +30,16 @@ import {
   getDocs,
   writeBatch,
   serverTimestamp,
-  addDoc,
+  doc,
 } from 'firebase/firestore';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import type { User as UserType } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 const formSchema = z.object({
-  studentIdentifier: z.string().min(1, 'O RA do aluno ou turma é obrigatório.'),
+  studentId: z.string().min(1, 'Selecione um aluno.'),
   coins: z.coerce.number().min(1, 'Mínimo 1 moeda.').max(10, 'Máximo 10 moedas.'),
   reason: z.string().min(3, 'A justificativa é obrigatória.'),
 });
@@ -44,18 +48,24 @@ export default function RewardPage() {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user: teacher } = useUser();
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  const studentsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'users'), where('role', '==', 'student')) : null
+  , [firestore]);
+  const { data: students, isLoading: studentsLoading } = useCollection<UserType>(studentsQuery);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      studentIdentifier: '',
+      studentId: '',
       coins: 1,
       reason: '',
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!teacher) {
+    if (!teacher || !firestore) {
       toast({
         variant: 'destructive',
         title: 'Erro de autenticação',
@@ -65,54 +75,42 @@ export default function RewardPage() {
     }
 
     try {
-      const usersRef = collection(firestore, 'users');
-      // Check if identifier is RA (numeric) or class (string)
-      const isRa = /^\d+$/.test(values.studentIdentifier);
-      
-      const q = isRa
-        ? query(usersRef, where('ra', '==', values.studentIdentifier), where('role', '==', 'student'))
-        : query(usersRef, where('class', '==', values.studentIdentifier.toUpperCase()), where('role', '==', 'student'));
+      const studentRef = doc(firestore, 'users', values.studentId);
+      const studentDoc = await getDocs(query(collection(firestore, 'users'), where('__name__', '==', values.studentId)));
 
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
+      if (studentDoc.empty) {
         toast({
           variant: 'destructive',
-          title: 'Aluno(s) não encontrado(s)',
-          description: 'Nenhum aluno corresponde ao identificador fornecido.',
+          title: 'Aluno não encontrado',
+          description: 'O aluno selecionado não foi encontrado no banco de dados.',
         });
         return;
       }
+      
+      const studentData = studentDoc.docs[0].data();
 
       const batch = writeBatch(firestore);
-      let studentCount = 0;
 
-      querySnapshot.forEach((doc) => {
-        studentCount++;
-        const student = doc.data();
-        const studentRef = doc.ref;
-
-        // Update student's coins
-        batch.update(studentRef, {
-          coins: (student.coins || 0) + values.coins,
-        });
-
-        // Create a reward record
-        const rewardRef = collection(firestore, 'rewards');
-        batch.set(doc(rewardRef), {
-            teacherId: teacher.uid,
-            studentId: doc.id,
-            coins: values.coins,
-            reason: values.reason,
-            timestamp: serverTimestamp()
-        });
+      // Update student's coins
+      batch.update(studentRef, {
+        coins: (studentData.coins || 0) + values.coins,
       });
 
+      // Create a reward record
+      const rewardRef = collection(firestore, 'rewards');
+      batch.set(doc(rewardRef), {
+          teacherId: teacher.uid,
+          studentId: values.studentId,
+          coins: values.coins,
+          reason: values.reason,
+          timestamp: serverTimestamp()
+      });
+      
       await batch.commit();
 
       toast({
         title: 'Recompensa Enviada!',
-        description: `${studentCount} aluno(s) receberam ${values.coins} IFCoins.`,
+        description: `O aluno recebeu ${values.coins} IFCoins.`,
       });
       form.reset();
     } catch (error) {
@@ -137,7 +135,7 @@ export default function RewardPage() {
         <CardHeader>
           <CardTitle>Nova Recompensa</CardTitle>
           <CardDescription>
-            Você pode recompensar um aluno pelo RA ou uma turma inteira pelo nome da turma.
+            Selecione um aluno da lista para enviar a recompensa.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,13 +143,64 @@ export default function RewardPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="studentIdentifier"
+                name="studentId"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>RA do Aluno ou Turma</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 2023001 ou 2A" {...field} />
-                    </FormControl>
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Aluno</FormLabel>
+                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? students?.find(
+                                  (student) => student.id === field.value
+                                )?.name
+                              : "Selecione um aluno"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                          <CommandInput placeholder="Procurar aluno..." />
+                          <CommandList>
+                            <CommandEmpty>{studentsLoading ? 'Carregando...' : 'Nenhum aluno encontrado.'}</CommandEmpty>
+                            <CommandGroup>
+                              {students?.map((student) => (
+                                <CommandItem
+                                  value={student.name}
+                                  key={student.id}
+                                  onSelect={() => {
+                                    form.setValue("studentId", student.id);
+                                    setPopoverOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      student.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <div>
+                                    <p>{student.name}</p>
+                                    <p className="text-xs text-muted-foreground">{student.ra} - {student.class}</p>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
