@@ -57,6 +57,7 @@ const TradeRow = ({ trade }: { trade: Trade }) => {
 
     useEffect(() => {
         const fetchUsers = async () => {
+            if (!firestore) return;
             const fromUserDoc = await getDoc(doc(firestore, 'users', trade.fromUserId));
             if(fromUserDoc.exists()) setFromUser(fromUserDoc.data() as UserType);
 
@@ -66,24 +67,25 @@ const TradeRow = ({ trade }: { trade: Trade }) => {
         fetchUsers();
     }, [trade, firestore]);
     
-    const handleTradeResponse = async (trade: Trade, accepted: boolean) => {
-        if (!user) return;
+    const handleTradeResponse = (trade: Trade, accepted: boolean) => {
+        if (!user || !firestore) return;
         
         const tradeRef = doc(firestore, 'trades', trade.id);
         if (accepted) {
             // Complex transaction logic would go here to swap items
             toast({title: 'Funcionalidade em desenvolvimento'});
             // For now, just update status
-             await updateDoc(tradeRef, { status: 'accepted' });
+             updateDoc(tradeRef, { status: 'accepted' }).catch(e => console.error(e));
 
         } else {
-            await updateDoc(tradeRef, { status: 'rejected' });
+            updateDoc(tradeRef, { status: 'rejected' }).catch(e => console.error(e));
             toast({title: 'Troca rejeitada.'});
         }
     }
     
-    const handleCancelTrade = async (tradeId: string) => {
-        await deleteDoc(doc(firestore, 'trades', tradeId));
+    const handleCancelTrade = (tradeId: string) => {
+        if (!firestore) return;
+        deleteDoc(doc(firestore, 'trades', tradeId)).catch(e => console.error(e));
         toast({title: 'Proposta cancelada.'});
     }
 
@@ -131,17 +133,22 @@ export default function TradesPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Queries for trades
-    const incomingTradesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'trades'), where('toUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
-    const outgoingTradesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'trades'), where('fromUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
+    const incomingTradesQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, 'trades'), where('toUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
+    const outgoingTradesQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, 'trades'), where('fromUserId', '==', user.uid), where('status', '==', 'pending')) : null, [user, firestore]);
     
     const { data: incomingTrades, isLoading: loadingIncoming } = useCollection<Trade>(incomingTradesQuery);
     const { data: outgoingTrades, isLoading: loadingOutgoing } = useCollection<Trade>(outgoingTradesQuery);
 
-    const handleSubmitTrade = async () => {
+    const handleSubmitTrade = () => {
         setIsSubmitting(true);
         if (!user) {
             toast({ variant: 'destructive', title: 'Usuário não logado.' });
             setIsSubmitting(false);
+            return;
+        }
+        if (!firestore) {
+            toast({ variant: 'destructive', title: 'Erro de conexão.' });
+             setIsSubmitting(false);
             return;
         }
         if (offeredCards.length === 0 && offeredCoins === 0) {
@@ -150,12 +157,10 @@ export default function TradesPage() {
             return;
         }
 
-        try {
-            // Find target user by RA
-            const usersRef = collection(firestore, 'users');
-            const q = query(usersRef, where('ra', '==', targetRa), where('role', '==', 'student'));
-            const querySnapshot = await getDocs(q);
-
+        // Find target user by RA
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('ra', '==', targetRa), where('role', '==', 'student'));
+        getDocs(q).then((querySnapshot) => {
             if (querySnapshot.empty) {
                 toast({ variant: 'destructive', title: 'Aluno de destino não encontrado.' });
                 setIsSubmitting(false);
@@ -171,7 +176,7 @@ export default function TradesPage() {
             }
 
             // Create trade document
-            await addDoc(collection(firestore, 'trades'), {
+            addDoc(collection(firestore, 'trades'), {
                 fromUserId: user.uid,
                 toUserId: targetUserId,
                 offeredCards: offeredCards.map(c => c.id),
@@ -180,22 +185,25 @@ export default function TradesPage() {
                 requestedCoins: requestedCoins,
                 status: 'pending',
                 createdAt: serverTimestamp(),
+            }).then(() => {
+                 toast({ title: 'Proposta de troca enviada!' });
+                // Reset form
+                setTargetRa('');
+                setOfferedCards([]);
+                setRequestedCards([]);
+                setOfferedCoins(0);
+                setRequestedCoins(0);
+            }).catch((error) => {
+                console.error("Error creating trade: ", error);
+                 toast({ variant: 'destructive', title: 'Erro ao criar troca.' });
+            }).finally(() => {
+                setIsSubmitting(false);
             });
-
-            toast({ title: 'Proposta de troca enviada!' });
-            // Reset form
-            setTargetRa('');
-            setOfferedCards([]);
-            setRequestedCards([]);
-            setOfferedCoins(0);
-            setRequestedCoins(0);
-
-        } catch (error) {
-            console.error("Error creating trade: ", error);
-            toast({ variant: 'destructive', title: 'Erro ao criar troca.' });
-        } finally {
+        }).catch((error) => {
+            console.error("Error finding user: ", error);
+            toast({ variant: 'destructive', title: 'Erro ao encontrar aluno.' });
             setIsSubmitting(false);
-        }
+        });
     };
 
   return (
