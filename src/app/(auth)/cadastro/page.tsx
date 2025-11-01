@@ -34,7 +34,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 const formSchema = z.object({
   name: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
   email: z.string().email({ message: 'E-mail inválido.' }),
-  role: z.enum(['student', 'admin'], { required_error: 'Selecione um perfil.' }),
+  role: z.enum(['student', 'teacher'], { required_error: 'Selecione um perfil.' }),
   ra: z.string().optional(),
   class: z.string().optional(),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
@@ -46,16 +46,22 @@ const formSchema = z.object({
     if (data.role === 'student') {
         return data.email.endsWith('@estudantes.ifpr.edu.br');
     }
-    // No email domain restriction for admins for flexibility, or you can add one.
-    // e.g. return data.email.endsWith('@ifpr.edu.br');
     return true;
 }, {
     message: 'O e-mail do estudante deve ser institucional (@estudantes.ifpr.edu.br).',
     path: ['email'],
-}).refine(data => data.role === 'admin' || (!!data.ra && data.ra.length > 0), {
+}).refine(data => {
+    if (data.role === 'teacher') {
+        return data.email.endsWith('@ifpr.edu.br');
+    }
+    return true;
+}, {
+    message: 'O e-mail do professor deve ser institucional (@ifpr.edu.br).',
+    path: ['email'],
+}).refine(data => data.role === 'teacher' || (!!data.ra && data.ra.length > 0), {
     message: 'O RA é obrigatório para alunos.',
     path: ['ra'],
-}).refine(data => data.role === 'admin' || (!!data.class && data.class.length > 0), {
+}).refine(data => data.role === 'teacher' || (!!data.class && data.class.length > 0), {
     message: 'A turma é obrigatória para alunos.',
     path: ['class'],
 });
@@ -93,7 +99,7 @@ export default function RegisterPage() {
         name: values.name,
         email: values.email,
         role: values.role,
-        coins: values.role === 'admin' ? 9999 : 0,
+        coins: 0, // Both start with 0 coins now
       };
 
       if (values.role === 'student') {
@@ -160,10 +166,10 @@ export default function RegisterPage() {
                           </FormItem>
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl>
-                              <RadioGroupItem value="admin" />
+                              <RadioGroupItem value="teacher" />
                             </FormControl>
                             <FormLabel className="font-normal">
-                              Admin
+                              Professor
                             </FormLabel>
                           </FormItem>
                         </RadioGroup>
@@ -191,9 +197,9 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail</FormLabel>
+                    <FormLabel>E-mail Institucional</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder={role === 'student' ? "seu.nome@estudantes.ifpr.edu.br" : "seu@email.com"} {...field} />
+                      <Input type="email" placeholder={role === 'student' ? "aluno@estudantes.ifpr.edu.br" : "professor@ifpr.edu.br"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
