@@ -65,14 +65,15 @@ service cloud.firestore {
      * @description Rules for the /users/{userId} collection.
      */
     match /users/{userId} {
-      // Any signed-in user can read any user's public profile document.
-      allow get: if isSignedIn();
-
-      // Only teachers or admins can list all users.
-      allow list: if isTeacher() || isAdmin();
+      // Any signed-in user can read any user's public profile document if they are a teacher or admin.
+      allow get: if isTeacher() || isAdmin();
+      
+      // Users can get their own document.
+      allow get: if isOwner(userId);
 
       // A user can create their own document (for self-signup).
-      allow create: if request.auth.uid == userId;
+      // Teachers and admins can also create documents for other users.
+      allow create: if request.auth.uid == userId || isTeacher() || isAdmin();
       
       // A user can update their own non-critical data.
       // Only admins/teachers can update any part of a user's document.
