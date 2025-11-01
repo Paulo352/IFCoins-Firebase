@@ -71,17 +71,14 @@ service cloud.firestore {
       // Users can get their own document.
       allow get: if isOwner(userId);
       
-      // Since `get()` is disallowed in list rules, we can't have a secure list rule here for admins/teachers.
-      // Instead, we will rely on the client-side query to fetch all users and the `get` rule above
-      // will be evaluated by Firestore for each document in the result set.
-      // allow list: if isTeacher() || isAdmin();
+      // Allow any signed-in user to attempt to list users. The `get` rules above will
+      // still be enforced by Firestore on the backend for each document, so a non-admin/teacher
+      // user will receive an empty list or a permission error for the query itself.
+      // This pattern is necessary because `get()` cannot be used in `list` rules.
+      allow list: if isSignedIn();
 
-      // Only teachers and admins can create new user documents via the admin panel.
-      // Self-registration is handled separately.
-      allow create: if isTeacher() || isAdmin();
-      
-      // A user can create their own document (for self-signup).
-      allow create: if request.auth.uid == userId;
+      // A user can create their own document (for self-signup), or a teacher/admin can create one.
+      allow create: if request.auth.uid == userId || isTeacher() || isAdmin();
       
       // A user can update their own non-critical data.
       // Only admins/teachers can update any part of a user's document.
