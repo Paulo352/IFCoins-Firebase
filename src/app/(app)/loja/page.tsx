@@ -197,6 +197,7 @@ export default function ShopPage() {
                     src={pack.imageUrl}
                     alt={pack.name}
                     fill
+                    style={{objectFit: "cover"}}
                     className="object-cover"
                   />
                 </div>

@@ -277,7 +277,7 @@ export default function AdminCardsPage() {
             ) : cards && cards.length > 0 ? (
               cards.map((card) => (
                 <div key={card.id} className="relative aspect-[2.5/3.5] w-full">
-                   <Image src={card.imageUrl} alt={card.name} layout="fill" className="object-cover rounded-lg" />
+                   <Image src={card.imageUrl} alt={card.name} fill style={{objectFit: "cover"}} className="object-cover rounded-lg" />
                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 rounded-b-lg">
                        <p className="font-bold truncate">{card.name}</p>
                        <p className="text-xs">{rarityStyles[card.rarity].label}</p>
