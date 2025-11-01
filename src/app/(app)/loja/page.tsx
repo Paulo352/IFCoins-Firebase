@@ -88,6 +88,7 @@ export default function ShopPage() {
             }
             const currentUserData = userDoc.data() as User;
             const currentCoins = currentUserData.coins;
+            const currentCollectionSize = currentUserData.collectionSize || 0;
             
             if (currentCoins < pack.price) {
                 throw "Saldo insuficiente!";
@@ -100,6 +101,7 @@ export default function ShopPage() {
             }
 
             const newCardsNames: string[] = [];
+            let newCardsCount = 0;
 
             // We must update the subcollection and the main user doc field
             for (const card of obtainedCards) {
@@ -112,11 +114,13 @@ export default function ShopPage() {
               } else {
                   newCardsNames.push(card.name); // It's a new card for the user
               }
+              newCardsCount++;
               transaction.set(userCardRef, { userId: user.uid, cardId: card.id, quantity: newQuantity }, { merge: true });
             }
             
             transaction.update(userRef, { 
                 coins: currentCoins - pack.price,
+                collectionSize: currentCollectionSize + newCardsCount
             });
 
             toast({

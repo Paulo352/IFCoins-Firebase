@@ -17,58 +17,81 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import type { User, User as UserType } from '@/lib/types';
-import { useMemo, useEffect, useState } from 'react';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import type { User as UserType } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
+import { Crown, Star, Gem } from 'lucide-react';
 
-type UserWithCollectionSize = UserType & { collectionSize: number };
+const RankingBadge = ({ rank }: { rank: number }) => {
+  if (rank === 1) {
+    return (
+      <Badge
+        variant="default"
+        className="bg-amber-400 text-amber-900 hover:bg-amber-400"
+      >
+        <Crown className="mr-1 h-3 w-3" />
+        {rank}º
+      </Badge>
+    );
+  }
+  if (rank === 2) {
+    return (
+      <Badge
+        variant="default"
+        className="bg-slate-400 text-slate-900 hover:bg-slate-400"
+      >
+        <Star className="mr-1 h-3 w-3" />
+        {rank}º
+      </Badge>
+    );
+  }
+  if (rank === 3) {
+    return (
+      <Badge
+        variant="default"
+        className="bg-orange-400 text-orange-900 hover:bg-orange-400"
+      >
+        <Gem className="mr-1 h-3 w-3" />
+        {rank}º
+      </Badge>
+    );
+  }
+  return <span className="text-muted-foreground font-medium">{rank}º</span>;
+};
+
 
 export default function RankingsPage() {
   const firestore = useFirestore();
-  const [topCollectors, setTopCollectors] = useState<UserWithCollectionSize[]>([]);
-  const [collectorsLoading, setCollectorsLoading] = useState(true);
 
   const richestQuery = useMemoFirebase(
     () =>
-      firestore ? query(
-        collection(firestore, 'users'),
-        where('role', '==', 'student'),
-        orderBy('coins', 'desc'),
-        limit(10)
-      ) : null,
+      firestore
+        ? query(
+            collection(firestore, 'users'),
+            where('role', '==', 'student'),
+            orderBy('coins', 'desc'),
+            limit(10)
+          )
+        : null,
     [firestore]
   );
   const { data: richestStudents, isLoading: richestLoading } =
-    useCollection<User>(richestQuery);
+    useCollection<UserType>(richestQuery);
 
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchCollectors = async () => {
-      setCollectorsLoading(true);
-      const studentsQuery = query(collection(firestore, 'users'), where('role', '==', 'student'));
-      const studentDocs = await getDocs(studentsQuery);
-      
-      const studentsWithCollectionSize: UserWithCollectionSize[] = [];
-
-      for (const studentDoc of studentDocs.docs) {
-          const student = studentDoc.data() as UserType;
-          const userCardsCollection = collection(firestore, 'users', studentDoc.id, 'cards');
-          const userCardsSnapshot = await getDocs(userCardsCollection);
-          let totalCards = 0;
-          userCardsSnapshot.forEach(doc => {
-              totalCards += doc.data().quantity || 0;
-          });
-          studentsWithCollectionSize.push({ ...student, id: studentDoc.id, collectionSize: totalCards });
-      }
-
-      studentsWithCollectionSize.sort((a, b) => b.collectionSize - a.collectionSize);
-      
-      setTopCollectors(studentsWithCollectionSize.slice(0, 10));
-      setCollectorsLoading(false);
-    };
-
-    fetchCollectors();
-  }, [firestore]);
+  const collectorsQuery = useMemoFirebase(
+    () =>
+      firestore
+        ? query(
+            collection(firestore, 'users'),
+            where('role', '==', 'student'),
+            orderBy('collectionSize', 'desc'),
+            limit(10)
+          )
+        : null,
+    [firestore]
+  );
+    const { data: topCollectors, isLoading: collectorsLoading } =
+    useCollection<UserType>(collectorsQuery);
 
 
   return (
@@ -76,7 +99,7 @@ export default function RankingsPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Classificações</h1>
         <p className="text-muted-foreground">
-          Veja os melhores alunos em diferentes categorias.
+          Veja os melhores alunos em diferentes categorias. Apenas estudantes aparecem aqui.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
@@ -91,7 +114,7 @@ export default function RankingsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead className="w-[60px]">#</TableHead>
                   <TableHead>Aluno</TableHead>
                   <TableHead className="text-right">Cartas</TableHead>
                 </TableRow>
@@ -103,15 +126,17 @@ export default function RankingsPage() {
                       Carregando...
                     </TableCell>
                   </TableRow>
-                ) : topCollectors.length > 0 ? (
+                ) : topCollectors && topCollectors.length > 0 ? (
                   topCollectors.map((student, index) => (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium">{index + 1}</TableCell>
+                      <TableCell className="font-medium text-center">
+                         <RankingBadge rank={index + 1} />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">
                             <AvatarImage
-                              src={`https://avatar.vercel.sh/${student.id}.png`}
+                              src={student.photoURL || `https://avatar.vercel.sh/${student.id}.png`}
                               alt={student.name}
                             />
                             <AvatarFallback>
@@ -121,8 +146,8 @@ export default function RankingsPage() {
                           <span>{student.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        {student.collectionSize}
+                      <TableCell className="text-right font-semibold">
+                        {student.collectionSize || 0}
                       </TableCell>
                     </TableRow>
                   ))
@@ -148,7 +173,7 @@ export default function RankingsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead className="w-[60px]">#</TableHead>
                   <TableHead>Aluno</TableHead>
                   <TableHead className="text-right">IFCoins</TableHead>
                 </TableRow>
@@ -163,12 +188,14 @@ export default function RankingsPage() {
                 ) : richestStudents && richestStudents.length > 0 ? (
                   richestStudents.map((student, index) => (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium">{index + 1}</TableCell>
+                      <TableCell className="font-medium text-center">
+                        <RankingBadge rank={index + 1} />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage
-                              src={`https://avatar.vercel.sh/${student.id}.png`}
+                             <AvatarImage
+                              src={student.photoURL || `https://avatar.vercel.sh/${student.id}.png`}
                               alt={student.name}
                             />
                             <AvatarFallback>
@@ -178,7 +205,7 @@ export default function RankingsPage() {
                           <span>{student.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right font-semibold">
                         {student.coins}
                       </TableCell>
                     </TableRow>
