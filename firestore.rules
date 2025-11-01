@@ -77,9 +77,9 @@ service cloud.firestore {
       // This pattern is necessary because `get()` cannot be used in `list` rules.
       allow list: if isSignedIn();
 
-      // A user can create their own document (for self-signup).
-      // Teachers and Admins can also create new users.
-      allow create: if request.auth.uid == userId || isTeacher() || isAdmin();
+      // Only teachers and admins can create new users through the admin panel.
+      // Self-registration is handled by the `isOwner` check.
+      allow create: if isOwner(userId) || isTeacher() || isAdmin();
       
       // A user can update their own non-critical data.
       // Only admins/teachers can update any part of a user's document.
@@ -168,3 +168,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

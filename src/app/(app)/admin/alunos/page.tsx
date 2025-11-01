@@ -29,19 +29,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import {
   addDoc,
   collection,
   doc,
   query,
   updateDoc,
+  getDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import type { UserRole } from '@/lib/types';
-import type { User } from '@/lib/types';
+import type { User as UserType } from '@/lib/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +55,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useEffect, useState } from 'react';
 
 const formSchema = z.object({
   role: z.enum(['student', 'teacher'], { required_error: 'Selecione um perfil.'}),
@@ -98,6 +101,9 @@ const formSchema = z.object({
 export default function AdminPeoplePage() {
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user: authUser } = useUser();
+  const [appUser, setAppUser] = useState<UserType | null>(null);
+  const [isAppUserLoading, setAppUserLoading] = useState(true);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,22 +115,43 @@ export default function AdminPeoplePage() {
       class: '',
     },
   });
+  
+  useEffect(() => {
+    if (authUser && firestore) {
+      const userRef = doc(firestore, 'users', authUser.uid);
+      getDoc(userRef).then(docSnap => {
+        if (docSnap.exists()) {
+          setAppUser(docSnap.data() as UserType);
+        }
+        setAppUserLoading(false);
+      });
+    }
+  }, [authUser, firestore]);
 
   const role = form.watch('role');
 
   const usersQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'users')) : null),
-    [firestore]
+    () => {
+      // Only run the query if the user is an admin or teacher
+      if (firestore && appUser && (appUser.role === 'admin' || appUser.role === 'teacher')) {
+        return query(collection(firestore, 'users'));
+      }
+      return null;
+    },
+    [firestore, appUser]
   );
-  const { data: users, isLoading } = useCollection<User>(usersQuery);
+  const { data: users, isLoading } = useCollection<UserType>(usersQuery);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore) return;
     try {
-      const userData: Partial<User> = {
+      const userData: Omit<UserType, 'id'> = {
         email: values.email,
         name: values.name,
-        role: values.role,
+        role: values.role as UserRole,
         coins: 0,
+        photoURL: '',
+        collectionSize: 0,
       };
 
       if (values.role === 'student') {
@@ -132,15 +159,17 @@ export default function AdminPeoplePage() {
         userData.class = values.class;
       }
       
-      // We cannot create a user with a specific ID here without a backend function
-      // for creating the user in Firebase Auth.
-      // So we add the document and let AppLayout handle user creation on first login.
-      // A better approach would be a Cloud Function that creates both Auth user and Firestore doc.
-      await addDoc(collection(firestore, 'users'), userData);
+      // This pattern is for admin creation. For self-registration, a different flow is needed.
+      // We are creating a document with a placeholder for auth, user needs to login to claim.
+      // A more robust solution involves Cloud Functions.
+      await addDoc(collection(firestore, 'users'), {
+        ...userData,
+        createdAt: serverTimestamp(),
+      });
 
       toast({
         title: 'Pré-cadastro Realizado!',
-        description: `O usuário ${values.name} foi adicionado. Ele precisará fazer o primeiro login para ativar a conta.`,
+        description: `O usuário ${values.name} foi adicionado. A senha será definida no primeiro login.`,
       });
       form.reset();
     } catch (error) {
@@ -149,7 +178,7 @@ export default function AdminPeoplePage() {
         variant: 'destructive',
         title: 'Erro ao cadastrar',
         description:
-          'Não foi possível cadastrar o usuário. Tente novamente.',
+          'Não foi possível cadastrar o usuário. Verifique as permissões e tente novamente.',
       });
     }
   }
@@ -318,7 +347,7 @@ export default function AdminPeoplePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isLoading || isAppUserLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center">
                     Carregando...
@@ -344,7 +373,7 @@ export default function AdminPeoplePage() {
                      <TableCell>{user.class || 'N/A'}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      {user.photoURL && (
+                      {user.photoURL && appUser?.role === 'admin' && (
                          <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" title="Remover foto">
@@ -373,7 +402,7 @@ export default function AdminPeoplePage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center">
-                    Nenhum usuário registrado.
+                    Nenhum usuário registrado ou você não tem permissão para visualizar.
                   </TableCell>
                 </TableRow>
               )}
@@ -384,3 +413,5 @@ export default function AdminPeoplePage() {
     </div>
   );
 }
+
+    
