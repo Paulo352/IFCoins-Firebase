@@ -146,7 +146,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <IFCoinIcon className="h-12 w-12 animate-spin" />
+          <IFCoinIcon className="h-16 w-16 animate-spin" />
            <p className="text-muted-foreground">Carregando...</p>
         </div>
       </div>

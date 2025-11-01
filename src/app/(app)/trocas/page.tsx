@@ -10,7 +10,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Repeat, Check, X } from 'lucide-react';
-import { CoinIcon } from '@/components/icons';
+import { IFCoinIcon } from '@/components/icons';
 import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, runTransaction, getDocs } from 'firebase/firestore';
 import type { User as UserType, Card as CardType, Trade } from '@/lib/types';
@@ -236,7 +236,7 @@ export default function TradesPage() {
              <div>
                 <Label htmlFor="coins-offered">IFCoins Oferecidos</Label>
                  <div className="relative">
-                    <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <IFCoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input id="coins-offered" type="number" min="0" placeholder="0" className="pl-10" value={offeredCoins} onChange={e => setOfferedCoins(Number(e.target.value))}/>
                 </div>
             </div>
@@ -248,7 +248,7 @@ export default function TradesPage() {
             </div>
              <div>
                 <Label htmlFor="coins-requested">IFCoins Solicitados</Label>                 <div className="relative">
-                    <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <IFCoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input id="coins-requested" type="number" min="0" placeholder="0" className="pl-10" value={requestedCoins} onChange={e => setRequestedCoins(Number(e.target.value))}/>
                 </div>
             </div>

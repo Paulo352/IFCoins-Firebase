@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Boxes, Users, Medal, Award, Book } from 'lucide-react';
-import { CoinIcon } from '@/components/icons';
+import { IFCoinIcon } from '@/components/icons';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import type { User as UserType } from '@/lib/types';
 import { doc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -90,7 +90,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Meus IFCoins</CardTitle>
-                <CoinIcon className="h-5 w-5 text-muted-foreground" />
+                <IFCoinIcon className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{userData.coins}</div>

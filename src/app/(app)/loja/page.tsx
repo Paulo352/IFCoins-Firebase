@@ -11,7 +11,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { Pack, Card as CardType, Rarity, User } from '@/lib/types';
 import Image from 'next/image';
-import { CoinIcon } from '@/components/icons';
+import { IFCoinIcon } from '@/components/icons';
 import { ShoppingBag } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch, runTransaction, getDoc, setDoc } from 'firebase/firestore';
@@ -207,7 +207,7 @@ export default function ShopPage() {
                 <CardContent className="flex-grow" />
                 <CardFooter className="flex flex-col items-start gap-4">
                   <div className="flex items-center gap-2 font-bold text-lg text-amber-500">
-                    <CoinIcon className="h-6 w-6" />
+                    <IFCoinIcon className="h-6 w-6" />
                     <span>{pack.price}</span>
                   </div>
                   <Button

@@ -1,34 +1,17 @@
+'use client';
 import type { SVGProps } from 'react';
+import Image from 'next/image';
 
-export function IFCoinIcon(props: SVGProps<SVGSVGElement>) {
+export function IFCoinIcon({ className, ...props }: SVGProps<SVGSVGElement> & { className?: string }) {
   return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" className="fill-accent" />
-      <path
-        d="M12 6v12"
-        className="stroke-accent-foreground"
-        strokeWidth="3"
-      />
-      <path
-        d="M16 6v12"
-        className="stroke-accent-foreground"
-        strokeWidth="3"
-      />
-      <path
-        d="M8 12h1.5"
-        className="stroke-accent-foreground"
-        strokeWidth="2.5"
-      />
-    </svg>
+    <Image
+      src="/ifcoin.png"
+      alt="IFCoin"
+      width={48}
+      height={48}
+      className={className}
+      priority
+    />
   );
 }
 

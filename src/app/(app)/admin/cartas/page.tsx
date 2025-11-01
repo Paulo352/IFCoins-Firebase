@@ -19,7 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { BookUp, Upload } from 'lucide-react';
 import { rarityStyles } from '@/lib/data';
-import { CoinIcon } from '@/components/icons';
+import { IFCoinIcon } from '@/components/icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -224,7 +224,7 @@ export default function AdminCardsPage() {
                   <FormItem>
                     <FormLabel>Preço (IFCoins)</FormLabel>
                     <div className="relative">
-                      <CoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <IFCoinIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <FormControl>
                         <Input
                           type="number"
