@@ -36,6 +36,14 @@ export type Pack = {
   imageHint: string;
 };
 
+export type Event = {
+    id: string;
+    name: string;
+    startDate: any; // Firestore Timestamp
+    endDate: any; // Firestore Timestamp
+    bonusMultiplier: number;
+}
+
 export type Trade = {
     id: string;
     fromUserId: string;
