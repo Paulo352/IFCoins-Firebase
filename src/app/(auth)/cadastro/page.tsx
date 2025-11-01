@@ -28,20 +28,36 @@ import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { setDoc, doc } from 'firebase/firestore';
 import type { User } from '@/lib/types';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const formSchema = z.object({
   name: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
-  email: z.string().email({ message: 'E-mail inválido.' }).refine(email => email.endsWith('@estudantes.ifpr.edu.br'), {
-    message: 'O e-mail deve ser institucional (@estudantes.ifpr.edu.br).',
-  }),
-  ra: z.string().min(5, { message: 'O RA é obrigatório.' }),
-  class: z.string().min(2, { message: 'A turma é obrigatória.' }),
+  email: z.string().email({ message: 'E-mail inválido.' }),
+  role: z.enum(['student', 'admin'], { required_error: 'Selecione um perfil.' }),
+  ra: z.string().optional(),
+  class: z.string().optional(),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: 'As senhas não coincidem.',
   path: ['confirmPassword'],
+}).refine(data => {
+    if (data.role === 'student') {
+        return data.email.endsWith('@estudantes.ifpr.edu.br');
+    }
+    // No email domain restriction for admins for flexibility, or you can add one.
+    // e.g. return data.email.endsWith('@ifpr.edu.br');
+    return true;
+}, {
+    message: 'O e-mail do estudante deve ser institucional (@estudantes.ifpr.edu.br).',
+    path: ['email'],
+}).refine(data => data.role === 'admin' || (!!data.ra && data.ra.length > 0), {
+    message: 'O RA é obrigatório para alunos.',
+    path: ['ra'],
+}).refine(data => data.role === 'admin' || (!!data.class && data.class.length > 0), {
+    message: 'A turma é obrigatória para alunos.',
+    path: ['class'],
 });
 
 export default function RegisterPage() {
@@ -56,12 +72,15 @@ export default function RegisterPage() {
     defaultValues: {
       name: '',
       email: '',
+      role: 'student',
       ra: '',
       class: '',
       password: '',
       confirmPassword: '',
     },
   });
+  
+  const role = form.watch('role');
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
@@ -70,14 +89,17 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      const newUser: Omit<User, 'id'> = {
+      const newUser: Partial<User> = {
         name: values.name,
         email: values.email,
-        ra: values.ra,
-        class: values.class,
-        role: 'student',
-        coins: 0,
+        role: values.role,
+        coins: values.role === 'admin' ? 9999 : 0,
       };
+
+      if (values.role === 'student') {
+        newUser.ra = values.ra;
+        newUser.class = values.class;
+      }
 
       await setDoc(doc(firestore, 'users', user.uid), newUser);
       
@@ -108,7 +130,7 @@ export default function RegisterPage() {
           <div className="mb-4 flex justify-center">
             <IFCoinIcon className="h-16 w-16" />
           </div>
-          <CardTitle className="text-2xl font-bold">Criar Conta de Aluno</CardTitle>
+          <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
           <CardDescription>
             Preencha os campos para se registrar no IFCoins.
           </CardDescription>
@@ -116,6 +138,41 @@ export default function RegisterPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Eu sou</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex space-x-4"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="student" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Aluno
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="admin" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Admin
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
               <FormField
                 control={form.control}
                 name="name"
@@ -134,42 +191,46 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail Institucional</FormLabel>
+                    <FormLabel>E-mail</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="seu.nome@estudantes.ifpr.edu.br" {...field} />
+                      <Input type="email" placeholder={role === 'student' ? "seu.nome@estudantes.ifpr.edu.br" : "seu@email.com"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="ra"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>RA</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Ex: 2023001" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="class"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Turma</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Ex: 2A INFO" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-              </div>
+
+              {role === 'student' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                      control={form.control}
+                      name="ra"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>RA</FormLabel>
+                          <FormControl>
+                          <Input placeholder="Ex: 2023001" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="class"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Turma</FormLabel>
+                          <FormControl>
+                          <Input placeholder="Ex: 2A INFO" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                </div>
+              )}
+
               <FormField
                 control={form.control}
                 name="password"
